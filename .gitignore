@@ -33,6 +33,10 @@ outputs/renders/*
 !outputs/models/.gitkeep
 !outputs/renders/.gitkeep
 
+# Local test data and outputs
+local_tests/*/images/
+local_tests/outputs/
+
 # IDE
 .vscode/
 .idea/
