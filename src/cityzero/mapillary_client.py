@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import mapillary.interface as mly
 import requests
-from mapillary import Mapillary
 
 from cityzero.config import BoundingBox, MapillaryConfig
 
@@ -22,7 +22,10 @@ class MapillaryClient:
             config: Mapillary API configuration
         """
         self.config = config
-        self.client = Mapillary(access_token=config.client_token)
+        # Set access token for the Mapillary SDK
+        mly.set_access_token(config.client_token)
+        
+        # Also setup requests session for direct API calls
         self.session = requests.Session()
         self.session.headers.update({
             "Authorization": f"OAuth {config.client_token}"
