@@ -42,3 +42,6 @@ outputs/renders/*
 
 # Logs
 *.log
+
+# Misc
+src/cityzero.egg-info/*
