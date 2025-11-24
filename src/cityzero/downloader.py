@@ -126,8 +126,9 @@ class ImageDownloader:
         seen_ids = set()
         
         # Query each cell with progress bar
+        # API limit is 5000 images per request
         for cell in tqdm(cells, desc="Discovering", unit="cell"):
-            images = self.client.get_images_in_bbox(cell, limit=10000)
+            images = self.client.get_images_in_bbox(cell, limit=5000)
             
             # Deduplicate images (same image might appear in adjacent cells)
             for img in images:
