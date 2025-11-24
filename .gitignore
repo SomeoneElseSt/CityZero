@@ -19,6 +19,7 @@ ENV/
 .env
 
 # Data directories
+data/neighborhoods/*
 data/raw/*
 data/processed/*
 data/maps/*
