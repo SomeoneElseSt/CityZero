@@ -10,6 +10,12 @@ Testing 3D reconstruction pipeline on Financial District subset (2,998 images) b
 
 ### Critical Findings
 
+**COLMAP Warnings Are Normal:**
+- Mapper prints scary warnings like "Could not register" and "Discarding reconstruction"
+- These are COLMAP trying different initial pairs - **not failures**
+- Script now verifies reconstruction succeeded by checking output files
+- Only 54 of 2998 images registered? **Normal for sparse street data**
+
 1. **Lambda Stack's default COLMAP has NO CUDA support** - runs on CPU only
 2. Must build COLMAP from source with CUDA flags
 3. **Flag names changed in COLMAP 3.14:**

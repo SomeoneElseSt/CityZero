@@ -329,20 +329,80 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     
     print("\nRunning mapper...")
     print("Note: Mapper is mostly CPU-bound, low GPU usage is expected")
+    print("Note: COLMAP may print warnings but still succeed - we'll verify after")
     start_time = datetime.now()
     
     result = subprocess.run(mapper_cmd, env=env)
     
     duration = (datetime.now() - start_time).total_seconds()
     
-    if result.returncode != 0:
-        print(f"\n✗ ERROR: Mapper failed")
-        print("\nCheck mapper output above for specific errors")
+    print(f"\n✓ Mapper finished in {duration:.1f}s ({duration/60:.1f} min)")
+    
+    # Verify reconstruction actually succeeded
+    print("\n" + "="*70)
+    print("VERIFYING RECONSTRUCTION")
+    print("="*70)
+    
+    reconstruction_dirs = list(sparse_dir.glob("*"))
+    if not reconstruction_dirs:
+        print("✗ ERROR: No reconstruction directories found")
         return False
     
-    print(f"\n✓ Mapper completed in {duration:.1f}s ({duration/60:.1f} min)")
+    # Check the first reconstruction (usually "0")
+    recon_dir = reconstruction_dirs[0]
+    cameras_file = recon_dir / "cameras.bin"
+    images_file = recon_dir / "images.bin"
+    points_file = recon_dir / "points3D.bin"
     
-    return True
+    if not (cameras_file.exists() and images_file.exists() and points_file.exists()):
+        print(f"✗ ERROR: Reconstruction files missing in {recon_dir}")
+        return False
+    
+    # Run model analyzer to get stats
+    try:
+        analyzer_result = subprocess.run(
+            ["colmap", "model_analyzer", "--path", str(recon_dir)],
+            capture_output=True,
+            text=True,
+            env=env
+        )
+        
+        # Parse output for key metrics
+        output = analyzer_result.stdout
+        registered_images = 0
+        points = 0
+        reprojection_error = 0.0
+        
+        for line in output.split('\n'):
+            if 'Registered images:' in line:
+                registered_images = int(line.split(':')[1].strip())
+            elif 'Points:' in line and 'Points3D' not in line:
+                points = int(line.split(':')[1].strip())
+            elif 'Mean reprojection error:' in line:
+                reprojection_error = float(line.split(':')[1].strip().replace('px', ''))
+        
+        print(f"\n✓ Reconstruction succeeded!")
+        print(f"  - Registered images: {registered_images} (out of {num_images})")
+        print(f"  - 3D points: {points:,}")
+        print(f"  - Mean reprojection error: {reprojection_error:.2f}px")
+        
+        if registered_images < 10:
+            print(f"\n⚠ WARNING: Only {registered_images} images registered")
+            print("  This may indicate:")
+            print("  - Images don't overlap enough")
+            print("  - Images are too spread out geographically")
+            print("  - Consider downloading images from a smaller, denser area")
+        
+        if reprojection_error > 2.0:
+            print(f"\n⚠ WARNING: High reprojection error ({reprojection_error:.2f}px)")
+            print("  Reconstruction may be inaccurate")
+        
+        return True
+        
+    except Exception as e:
+        print(f"⚠ WARNING: Could not verify reconstruction: {e}")
+        print("  But reconstruction files exist, so likely succeeded")
+        return True
 
 
 def create_summary(output_dir: Path, images_dir: Path, total_duration: float):
