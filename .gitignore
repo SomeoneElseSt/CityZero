@@ -37,6 +37,10 @@ outputs/renders/*
 local_tests/*/images/
 local_tests/outputs/
 
+# Compressed archives and SSH keys
+*.tar.gz
+*.pem
+
 # IDE
 .vscode/
 .idea/
