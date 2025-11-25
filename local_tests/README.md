@@ -105,7 +105,15 @@ tar -czf colmap_output.tar.gz colmap_output/
 # Mac: download and train
 scp -i *.pem ubuntu@YOUR_IP:~/colmap_output.tar.gz .
 tar -xzf colmap_output.tar.gz
-python3 run_brush_training.py
+python3 run_brush_training.py  # ~4 hours on M4 Mac
+
+# View trained model
+# Option 1: Start Brush viewer, then open file in UI
+~/.brush/target/release/brush_app
+# Then: File > Open > Navigate to outputs/gaussian_splatting/brush/export_15000.ply
+
+# Option 2: Direct load (if supported)
+~/.brush/target/release/brush_app outputs/gaussian_splatting/brush/export_15000.ply
 ```
 
 ---
@@ -133,6 +141,54 @@ nvidia-smi dmon -s u      # Utilization only
 - Estimated time: 12-18 hours
 - Estimated cost: **$13-20**
 - GPU utilization: 80-95%
+
+---
+
+## Reusing Pipeline for New Datasets
+
+### Quick Steps
+
+1. **Download new images** (use main downloader from project root)
+2. **Create new directory** in `local_tests/`:
+   ```bash
+   mkdir new_area_images
+   mv /path/to/images new_area_images/images/
+   ```
+
+3. **Run Lambda preprocessing** (reuse built COLMAP with `--skip-build`):
+   ```bash
+   tar -czf images.tar.gz new_area_images/images/
+   scp -i *.pem images.tar.gz ubuntu@IP:~/
+   # On Lambda:
+   python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_output --skip-build
+   ```
+
+4. **Download and extract**:
+   ```bash
+   scp -i *.pem ubuntu@IP:~/colmap_output.tar.gz .
+   tar -xzf colmap_output.tar.gz
+   mkdir -p outputs/new_area_colmap
+   mv colmap_output outputs/new_area_colmap/
+   ```
+
+5. **Create symlink** (critical - Brush needs to find images):
+   ```bash
+   cd outputs/new_area_colmap/colmap_output
+   ln -s ../../../new_area_images/images images
+   cd ../../..
+   ```
+
+6. **Update `run_brush_training.py` paths**:
+   ```python
+   IMAGES_DIR = SCRIPT_DIR / "new_area_images" / "images"
+   COLMAP_SPARSE_DIR = SCRIPT_DIR / "outputs" / "new_area_colmap" / "colmap_output" / "sparse" / "0"
+   ```
+
+7. **Train and view**:
+   ```bash
+   python3 run_brush_training.py
+   ~/.brush/target/release/brush_app  # Then open the .ply file
+   ```
 
 ---
 
