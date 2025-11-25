@@ -10,3 +10,7 @@ As of now: upload N images to a Lambda Cloud instance. There, use COLMAP with CU
 ![v.01 - 15k iterations - Image 1](./assets/v_0.1_15k_image_1.png)
 
 ![v.01 - 15k iterations - Image 2](./assets/v_0.1_15k_image_2.png)      
+
+Later I trained a 30k iteration version too that made some interesting internal mini-representations of parts of the training images, like the Transamerica pyramid shown below in a small set of clustered gaussians.
+
+![v.01 - 30k iterations - Image 1](./assets/v_0.1_30k_image_1.png)
