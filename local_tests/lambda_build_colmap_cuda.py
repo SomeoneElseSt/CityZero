@@ -1,15 +1,59 @@
 #!/usr/bin/env python3
 """
-Build COLMAP with CUDA support on Lambda Cloud A100 GPU.
-This script will take 30-45 minutes to complete.
+COLMAP CUDA Build & GPU-Accelerated Preprocessing for Lambda Cloud
 
-VALIDATED for:
-- Ubuntu 24.04
+This script autonomously handles everything needed to run GPU-accelerated 3D reconstruction
+on Lambda Cloud A100 instances. Battle-tested on Financial District dataset (2998 images).
+
+KEY LEARNINGS:
+- Lambda Stack's default COLMAP has NO CUDA support (CPU-only)
+- Must build COLMAP from source with CUDA flags (30-45 min one-time)
+- Flag names changed in COLMAP 3.14:
+  * Use --FeatureExtraction.use_gpu (not --SiftExtraction.use_gpu)
+  * Use --FeatureMatching.use_gpu (not --SiftMatching.use_gpu)
+- COLMAP prints scary warnings during mapper but still succeeds
+- Script verifies reconstruction by checking output files + stats
+
+PERFORMANCE (3K images, A100):
+- Build: 30-45 min (one-time)
+- Feature extraction: ~2 min (GPU, 80-95% utilization)
+- Feature matching: ~1 min (GPU, 80-95% utilization)
+- Mapper: 10-30 min (CPU-bound, low GPU usage is normal)
+- Total: ~45-80 min (vs 10 hours on M4 Mac)
+
+VALIDATED FOR:
+- Ubuntu 24.04 LTS
 - CUDA 12.x (Lambda Stack default)
-- A100 GPU
+- A100 GPU (40GB)
+- Any unordered image dataset (Mapillary, custom, etc.)
 
-Usage:
-    python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_cuda_output
+USAGE:
+
+  # Full pipeline (first time - builds COLMAP + processes images):
+  python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_output
+
+  # Build COLMAP once, then process multiple datasets:
+  python3 lambda_build_colmap_cuda.py --build-only
+  python3 lambda_build_colmap_cuda.py --images ~/dataset1 --output ~/out1 --skip-build
+  python3 lambda_build_colmap_cuda.py --images ~/dataset2 --output ~/out2 --skip-build
+
+WORKFLOW:
+  1. Upload: scp -i *.pem images.tar.gz lambda_build_colmap_cuda.py ubuntu@IP:~/
+  2. SSH: ssh -i *.pem ubuntu@IP
+  3. Decompress: tar -xzf images.tar.gz
+  4. Run: python3 lambda_build_colmap_cuda.py --images ~/images --output ~/output
+  5. Download: scp -i *.pem ubuntu@IP:~/output.tar.gz .
+
+OUTPUT:
+- Sparse reconstruction in COLMAP format (cameras.bin, images.bin, points3D.bin)
+- Compatible with Gaussian Splatting, NeRF, 3DGS training
+- Automatically compressed for download
+
+NOTES:
+- Only subset of images may register (e.g., 54 of 2998) - normal for sparse street data
+- COLMAP warnings like "Could not register" are normal - script verifies success
+- Use tmux to prevent disconnection: tmux new -s colmap
+- Always terminate Lambda instance after download to stop billing
 """
 
 import argparse
