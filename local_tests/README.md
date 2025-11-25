@@ -14,12 +14,9 @@ local_tests/
 ├── outputs/                     # Training outputs (gitignored)
 │   ├── gaussian_splatting/      # Brush outputs
 │   └── triangle_splatting/      # Triangle splatting outputs
-├── scripts/                     # Helper scripts
-│   ├── upload_to_lambda.sh      # Upload data to Lambda
-│   └── download_from_lambda.sh  # Download results from Lambda
 ├── train_gaussian_mac.py        # COLMAP preprocessing for Mac
 ├── run_brush_training.py        # Automated Brush training
-├── lambda_glomap_preprocessing.py  # Lambda Cloud GLOMAP script
+├── lambda_glomap_preprocessing.py  # Lambda Cloud preprocessing (COLMAP + GLOMAP)
 └── README.md                    # This file
 ```
 
