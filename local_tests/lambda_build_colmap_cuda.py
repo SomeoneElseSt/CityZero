@@ -33,20 +33,24 @@ def check_system():
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name,driver_version,cuda_version", "--format=csv,noheader"],
             capture_output=True,
-            text=True,
-            check=True
+            text=True
         )
-        print(f"✓ GPU: {result.stdout.strip()}")
+        if result.returncode == 0:
+            print(f"✓ GPU: {result.stdout.strip()}")
+        else:
+            print("⚠ WARNING: nvidia-smi failed, but continuing...")
     except:
-        print("✗ ERROR: nvidia-smi failed")
-        return False
+        print("⚠ WARNING: nvidia-smi not accessible, but continuing...")
     
     # Check CUDA
     try:
-        result = subprocess.run(["nvcc", "--version"], capture_output=True, text=True, check=True)
-        print(f"✓ CUDA compiler available")
+        result = subprocess.run(["nvcc", "--version"], capture_output=True, text=True)
+        if result.returncode == 0:
+            print("✓ CUDA compiler available")
+        else:
+            print("⚠ WARNING: nvcc not found - will be available after dependencies")
     except:
-        print("⚠ WARNING: nvcc not found - will install CUDA toolkit")
+        print("⚠ WARNING: nvcc not found - will be available after dependencies")
     
     # Check Ubuntu version
     try:
@@ -257,12 +261,15 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
         "--SiftExtraction.domain_size_pooling", "1",
     ]
     
-    print("\nExtracting features with CUDA...")
-    start_time = datetime.now()
-    
+    # Environment for headless execution
     env = dict(os.environ)
     env["QT_QPA_PLATFORM"] = "offscreen"
     env["DISPLAY"] = ""
+    
+    print("\nExtracting features with CUDA...")
+    print("Expected GPU utilization: 80-95%")
+    print("Monitor with: watch -n 2 nvidia-smi")
+    start_time = datetime.now()
     
     result = subprocess.run(feat_cmd, env=env)
     
@@ -270,6 +277,9 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     
     if result.returncode != 0:
         print(f"\n✗ ERROR: Feature extraction failed")
+        print("\nPossible fixes:")
+        print("  1. Check flags with: colmap feature_extractor --help | grep gpu")
+        print("  2. Verify COLMAP has CUDA: colmap -h | grep CUDA")
         return False
     
     print(f"\n✓ Feature extraction completed in {duration:.1f}s ({duration/60:.1f} min)")
@@ -284,11 +294,12 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
         "--database_path", str(database_path),
         "--FeatureMatching.use_gpu", "1",
         "--FeatureMatching.gpu_index", "0",
-        "--SiftMatching.guided_matching", "1",
-        "--SiftMatching.max_num_matches", "65536",
+        "--FeatureMatching.guided_matching", "1",
+        "--FeatureMatching.max_num_matches", "65536",
     ]
     
     print("\nMatching features with CUDA...")
+    print("Expected GPU utilization: 80-95%")
     start_time = datetime.now()
     
     result = subprocess.run(match_cmd, env=env)
@@ -297,6 +308,9 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     
     if result.returncode != 0:
         print(f"\n✗ ERROR: Feature matching failed")
+        print("\nPossible fixes:")
+        print("  1. Check flags with: colmap exhaustive_matcher --help | grep gpu")
+        print("  2. Try without guided_matching flag")
         return False
     
     print(f"\n✓ Feature matching completed in {duration:.1f}s ({duration/60:.1f} min)")
@@ -314,6 +328,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     ]
     
     print("\nRunning mapper...")
+    print("Note: Mapper is mostly CPU-bound, low GPU usage is expected")
     start_time = datetime.now()
     
     result = subprocess.run(mapper_cmd, env=env)
@@ -322,6 +337,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     
     if result.returncode != 0:
         print(f"\n✗ ERROR: Mapper failed")
+        print("\nCheck mapper output above for specific errors")
         return False
     
     print(f"\n✓ Mapper completed in {duration:.1f}s ({duration/60:.1f} min)")
@@ -390,22 +406,38 @@ def compress_output(output_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build COLMAP with CUDA and run preprocessing"
+        description="Build COLMAP with CUDA and run GPU-accelerated preprocessing",
+        epilog="""
+Examples:
+  # Full pipeline (build + process):
+  python3 %(prog)s --images ~/images --output ~/colmap_output
+  
+  # Build only (for later use):
+  python3 %(prog)s --build-only
+  
+  # Process with already-built COLMAP:
+  python3 %(prog)s --images ~/images --output ~/colmap_output --skip-build
+        """
     )
     parser.add_argument(
         "--images",
         type=Path,
-        help="Path to images directory (optional, for testing after build)"
+        help="Path to images directory"
     )
     parser.add_argument(
         "--output",
         type=Path,
-        help="Path to output directory (optional, for testing after build)"
+        help="Path to output directory"
     )
     parser.add_argument(
         "--build-only",
         action="store_true",
         help="Only build COLMAP, don't run preprocessing"
+    )
+    parser.add_argument(
+        "--skip-build",
+        action="store_true",
+        help="Skip COLMAP build (use if already built)"
     )
     
     args = parser.parse_args()
@@ -419,54 +451,65 @@ def main():
     
     # Step 1: Check system
     if not check_system():
-        return 1
+        print("⚠ System check had warnings, but continuing...")
     
-    # Step 2: Install dependencies
-    if not install_dependencies():
-        return 1
-    
-    # Step 3: Build COLMAP with CUDA
-    if not build_colmap_cuda():
-        return 1
-    
-    # Step 4: Verify CUDA support
-    if not verify_cuda_colmap():
-        return 1
+    # Steps 2-4: Build COLMAP (unless skipped)
+    if not args.skip_build:
+        if not install_dependencies():
+            return 1
+        
+        if not build_colmap_cuda():
+            return 1
+        
+        if not verify_cuda_colmap():
+            print("⚠ CUDA verification failed, but attempting to continue...")
+    else:
+        print("\n✓ Skipping build (--skip-build)")
+        if not verify_cuda_colmap():
+            print("✗ ERROR: COLMAP not found or doesn't have CUDA")
+            print("  Remove --skip-build to build COLMAP first")
+            return 1
     
     if args.build_only:
         print("\n" + "="*70)
         print("BUILD COMPLETE!")
         print("="*70)
         print("\nCOLMAP with CUDA is now installed at: /usr/local/bin/colmap")
-        print("\nTo run preprocessing later:")
-        print(f"  python3 {Path(__file__).name} --images ~/images --output ~/output")
+        print("\nTo run preprocessing:")
+        print(f"  python3 {Path(__file__).name} --images ~/images --output ~/output --skip-build")
         return 0
     
     # Step 5: Run preprocessing if images provided
     if args.images and args.output:
         if not run_colmap_pipeline(args.images, args.output):
+            print("\n" + "="*70)
+            print("PIPELINE FAILED")
+            print("="*70)
+            print("\nTo resume manually, run commands from README.md")
             return 1
         
         total_duration = (datetime.now() - total_start_time).total_seconds()
         create_summary(args.output, args.images, total_duration)
         
         if not compress_output(args.output):
-            print("\n⚠ WARNING: Failed to compress output")
+            print("\n⚠ WARNING: Failed to compress output, but processing succeeded")
         
         print("\n" + "="*70)
         print("ALL DONE!")
         print("="*70)
-        print(f"\nOutput: {args.output}")
-        print(f"Archive: {args.output.parent / f'{args.output.name}.tar.gz'}")
-        print("\nTo download:")
+        print(f"\nOutput directory: {args.output}")
+        print(f"Compressed archive: {args.output.parent / f'{args.output.name}.tar.gz'}")
+        print("\nTo download to your local machine:")
         print(f"  scp -i *.pem ubuntu@YOUR_IP:~/{args.output.name}.tar.gz .")
+        print("\nDon't forget to terminate your Lambda instance!")
         
     else:
-        print("\n" + "="*70)
-        print("BUILD COMPLETE!")
-        print("="*70)
-        print("\nNo images specified. To run preprocessing:")
-        print(f"  python3 {Path(__file__).name} --images ~/images --output ~/output")
+        if not args.build_only:
+            print("\n" + "="*70)
+            print("BUILD COMPLETE - NO IMAGES PROVIDED")
+            print("="*70)
+            print("\nTo run preprocessing:")
+            print(f"  python3 {Path(__file__).name} --images ~/images --output ~/output --skip-build")
     
     return 0
 
