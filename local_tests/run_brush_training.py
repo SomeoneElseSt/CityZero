@@ -25,8 +25,8 @@ import sys
 # ============================================================================
 
 SCRIPT_DIR = Path(__file__).parent
-FINANCIAL_DISTRICT_DIR = SCRIPT_DIR / "financial_district"
-COLMAP_DIR = SCRIPT_DIR / "outputs" / "gaussian_splatting" / "colmap"
+FINANCIAL_DISTRICT_DIR = SCRIPT_DIR / "financial_district_images"
+COLMAP_DIR = SCRIPT_DIR / "outputs" / "colmap_output" / "colmap_output" / "sparse" / "0"
 BRUSH_OUTPUT_DIR = SCRIPT_DIR / "outputs" / "gaussian_splatting" / "brush"
 TRAINING_INFO_PATH = SCRIPT_DIR / "outputs" / "gaussian_splatting" / "training_info.json"
 
