@@ -25,8 +25,8 @@ import sys
 # ============================================================================
 
 SCRIPT_DIR = Path(__file__).parent
-FINANCIAL_DISTRICT_DIR = SCRIPT_DIR / "financial_district_images"
-COLMAP_DIR = SCRIPT_DIR / "outputs" / "colmap_output" / "colmap_output" / "sparse" / "0"
+IMAGES_DIR = SCRIPT_DIR / "financial_district_images" / "images"
+COLMAP_SPARSE_DIR = SCRIPT_DIR / "outputs" / "colmap_output" / "colmap_output" / "sparse" / "0"
 BRUSH_OUTPUT_DIR = SCRIPT_DIR / "outputs" / "gaussian_splatting" / "brush"
 TRAINING_INFO_PATH = SCRIPT_DIR / "outputs" / "gaussian_splatting" / "training_info.json"
 
@@ -97,43 +97,34 @@ def validate_colmap_output():
     """Check that COLMAP processing completed successfully."""
     print("Validating COLMAP output...")
     
-    if not COLMAP_DIR.exists():
-        print(f"✗ COLMAP directory not found: {COLMAP_DIR}")
-        print()
-        print("Please run train_gaussian_mac.py first to process images with COLMAP.")
-        return False
-    
     # Check for images directory
-    images_dir = COLMAP_DIR / "images"
-    if not images_dir.exists():
-        print(f"✗ Images directory not found: {images_dir}")
+    if not IMAGES_DIR.exists():
+        print(f"✗ Images directory not found: {IMAGES_DIR}")
         print()
-        print("COLMAP processing may not be complete. Please wait for it to finish.")
+        print("Please ensure images are in: financial_district_images/images/")
         return False
     
     # Count images
-    image_files = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
+    image_files = list(IMAGES_DIR.glob("*.jpg")) + list(IMAGES_DIR.glob("*.png"))
     if len(image_files) == 0:
-        print(f"✗ No images found in {images_dir}")
+        print(f"✗ No images found in {IMAGES_DIR}")
         print()
-        print("COLMAP processing may not be complete. Please wait for it to finish.")
         return False
     
     print(f"  Found {len(image_files)} images")
     
     # Check for sparse reconstruction
-    sparse_dir = COLMAP_DIR / "sparse" / "0"
-    if not sparse_dir.exists():
-        print(f"✗ Sparse reconstruction directory not found: {sparse_dir}")
+    if not COLMAP_SPARSE_DIR.exists():
+        print(f"✗ Sparse reconstruction directory not found: {COLMAP_SPARSE_DIR}")
         print()
-        print("COLMAP processing may not be complete. Please wait for it to finish.")
+        print("Please download COLMAP output from Lambda first.")
         return False
     
     required_files = ["cameras.bin", "images.bin", "points3D.bin"]
     
     missing_files = []
     for filename in required_files:
-        filepath = sparse_dir / filename
+        filepath = COLMAP_SPARSE_DIR / filename
         if not filepath.exists():
             missing_files.append(filename)
         else:
@@ -152,7 +143,7 @@ def validate_colmap_output():
         print("COLMAP processing may not be complete. Please wait for it to finish.")
         return False
     
-    print(f"✓ COLMAP output validated at {COLMAP_DIR}")
+    print(f"✓ COLMAP output validated at {COLMAP_SPARSE_DIR}")
     return True
 
 
@@ -167,7 +158,7 @@ def run_brush_training():
     print("BRUSH TRAINING")
     print("="*70)
     print()
-    print(f"Input:  {COLMAP_DIR}")
+    print(f"Input:  {COLMAP_SPARSE_DIR}")
     print(f"Output: {BRUSH_OUTPUT_DIR}")
     print()
     print(f"Training steps: {TRAINING_STEPS}")
@@ -180,12 +171,14 @@ def run_brush_training():
     
     # Build Brush command
     # Format: brush [OPTIONS] <DATA_PATH>
+    # DATA_PATH should point to directory containing sparse/ folder
+    colmap_root = COLMAP_SPARSE_DIR.parent.parent  # Go up from sparse/0 to colmap_output root
     cmd = [
         str(BRUSH_EXECUTABLE),
         "--total-steps", str(TRAINING_STEPS),
         "--max-splats", str(MAX_SPLATS),
         "--sh-degree", str(SH_DEGREE),
-        str(COLMAP_DIR),
+        str(colmap_root),
     ]
     
     print("Running command:")
@@ -216,7 +209,7 @@ def run_brush_training():
 def save_training_info():
     """Save training information to JSON."""
     info = {
-        "colmap_dir": str(COLMAP_DIR),
+        "colmap_dir": str(COLMAP_SPARSE_DIR),
         "brush_output_dir": str(BRUSH_OUTPUT_DIR),
         "training_steps": TRAINING_STEPS,
         "max_splats": MAX_SPLATS,
