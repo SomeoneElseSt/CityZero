@@ -46,7 +46,7 @@ import shutil
 def check_system():
     """Verify system requirements."""
     print("\n" + "="*70)
-    print("SYSTEM VALIDATION")
+    print("COLMAP CUDA BUILD & GPU-ACCELERATED PREPROCESSING SCRIPT")
     print("="*70)
     
     # Check GPU
@@ -57,30 +57,30 @@ def check_system():
             text=True
         )
         if result.returncode == 0:
-            print(f"✓ GPU: {result.stdout.strip()}")
+            print(f"GPU: {result.stdout.strip()}")
         else:
-            print("⚠ WARNING: nvidia-smi failed, but continuing...")
+            print("WARNING: nvidia-smi failed, but continuing...")
     except:
-        print("⚠ WARNING: nvidia-smi not accessible, but continuing...")
+        print("WARNING: nvidia-smi not accessible, but continuing...")
     
     # Check CUDA
     try:
         result = subprocess.run(["nvcc", "--version"], capture_output=True, text=True)
         if result.returncode == 0:
-            print("✓ CUDA compiler available")
+            print("CUDA compiler available")
         else:
-            print("⚠ WARNING: nvcc not found - will be available after dependencies")
+            print("WARNING: nvcc not found - will be available after dependencies")
     except:
-        print("⚠ WARNING: nvcc not found - will be available after dependencies")
+        print("WARNING: nvcc not found - will be available after dependencies")
     
     # Check Ubuntu version
     try:
         with open("/etc/os-release") as f:
             content = f.read()
             if "24.04" in content:
-                print("✓ Ubuntu 24.04 detected")
+                print("Ubuntu 24.04 detected")
             else:
-                print("⚠ WARNING: Not Ubuntu 24.04, may have compatibility issues")
+                print("WARNING: Not Ubuntu 24.04, may have compatibility issues")
     except:
         pass
     
@@ -109,7 +109,7 @@ def install_dependencies():
         "python3-pip",
     ]
     
-    print(f"\nInstalling {len(packages)} packages...")
+    print(f"Installing {len(packages)} packages...")
     print("This will take 5-10 minutes...\n")
     
     # Update package list
@@ -120,10 +120,10 @@ def install_dependencies():
     result = subprocess.run(cmd)
     
     if result.returncode != 0:
-        print("✗ ERROR: Failed to install dependencies")
+        print("ERROR: Failed to install dependencies")
         return False
     
-    print("\n✓ All dependencies installed")
+    print("All dependencies installed")
     return True
 
 
@@ -132,8 +132,7 @@ def build_colmap_cuda():
     print("\n" + "="*70)
     print("BUILDING COLMAP WITH CUDA")
     print("="*70)
-    print("This will take 30-45 minutes on an A100...")
-    print()
+    print("This will take 30-45 minutes on an A100...\n")
     
     colmap_dir = Path.home() / "colmap_cuda"
     
@@ -143,11 +142,11 @@ def build_colmap_cuda():
         cmd = ["git", "clone", "https://github.com/colmap/colmap.git", str(colmap_dir)]
         result = subprocess.run(cmd)
         if result.returncode != 0:
-            print("✗ ERROR: Failed to clone COLMAP")
+            print("ERROR: Failed to clone COLMAP")
             return False
-        print("✓ COLMAP cloned")
+        print("COLMAP cloned")
     else:
-        print(f"✓ COLMAP already cloned at {colmap_dir}")
+        print(f"COLMAP already cloned at {colmap_dir}")
     
     # Create build directory
     build_dir = colmap_dir / "build"
@@ -168,15 +167,14 @@ def build_colmap_cuda():
     
     result = subprocess.run(cmake_cmd, cwd=build_dir)
     if result.returncode != 0:
-        print("✗ ERROR: CMake configuration failed")
+        print("ERROR: CMake configuration failed")
         return False
     
-    print("✓ CMake configuration complete")
+    print("CMake configuration complete")
     
     # Build
     print("\nBuilding COLMAP...")
-    print("This is the long part (30-40 minutes)...")
-    print("Go grab a coffee ☕\n")
+    print("This is the long part (30-40 minutes)...\n")
     
     start_time = datetime.now()
     
@@ -191,10 +189,10 @@ def build_colmap_cuda():
     duration = (end_time - start_time).total_seconds()
     
     if result.returncode != 0:
-        print(f"\n✗ ERROR: Build failed after {duration:.1f} seconds")
+        print(f"\nERROR: Build failed after {duration:.1f} seconds")
         return False
     
-    print(f"\n✓ COLMAP built successfully in {duration/60:.1f} minutes")
+    print(f"\nCOLMAP built successfully in {duration/60:.1f} minutes")
     
     # Install
     print("\nInstalling COLMAP...")
@@ -202,10 +200,10 @@ def build_colmap_cuda():
     result = subprocess.run(install_cmd, cwd=build_dir)
     
     if result.returncode != 0:
-        print("✗ ERROR: Installation failed")
+        print("ERROR: Installation failed")
         return False
     
-    print("✓ COLMAP installed to /usr/local/bin/colmap")
+    print("COLMAP installed to /usr/local/bin/colmap")
     return True
 
 
@@ -224,7 +222,7 @@ def verify_cuda_colmap():
         )
         
         if "with CUDA" in result.stdout:
-            print("✓ COLMAP compiled WITH CUDA support")
+            print("COLMAP compiled WITH CUDA support")
             print(f"\nVersion info:")
             # Extract version line
             for line in result.stdout.split('\n'):
@@ -232,11 +230,11 @@ def verify_cuda_colmap():
                     print(f"  {line.strip()}")
             return True
         else:
-            print("✗ ERROR: COLMAP was NOT compiled with CUDA")
+            print("ERROR: COLMAP was NOT compiled with CUDA")
             return False
             
     except Exception as e:
-        print(f"✗ ERROR: Could not verify COLMAP: {e}")
+        print(f"ERROR: Could not verify COLMAP: {e}")
         return False
 
 
@@ -248,15 +246,15 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     
     # Validate inputs
     if not images_dir.exists():
-        print(f"✗ ERROR: Images directory does not exist: {images_dir}")
+        print(f"ERROR: Images directory does not exist: {images_dir}")
         return False
     
     num_images = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
     if num_images == 0:
-        print(f"✗ ERROR: No .jpg or .png images found in {images_dir}")
+        print(f"ERROR: No .jpg or .png images found in {images_dir}")
         return False
     
-    print(f"✓ Found {num_images} images")
+    print(f"Found {num_images} images")
     
     # Prepare output directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -297,13 +295,13 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     duration = (datetime.now() - start_time).total_seconds()
     
     if result.returncode != 0:
-        print(f"\n✗ ERROR: Feature extraction failed")
+        print(f"\nERROR: Feature extraction failed")
         print("\nPossible fixes:")
         print("  1. Check flags with: colmap feature_extractor --help | grep gpu")
         print("  2. Verify COLMAP has CUDA: colmap -h | grep CUDA")
         return False
     
-    print(f"\n✓ Feature extraction completed in {duration:.1f}s ({duration/60:.1f} min)")
+    print(f"\nFeature extraction completed in {duration:.1f}s ({duration/60:.1f} min)")
     
     # Step 2: Feature Matching (CUDA)
     print("\n" + "="*70)
@@ -328,13 +326,13 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     duration = (datetime.now() - start_time).total_seconds()
     
     if result.returncode != 0:
-        print(f"\n✗ ERROR: Feature matching failed")
+        print(f"\nERROR: Feature matching failed")
         print("\nPossible fixes:")
         print("  1. Check flags with: colmap exhaustive_matcher --help | grep gpu")
         print("  2. Try without guided_matching flag")
         return False
     
-    print(f"\n✓ Feature matching completed in {duration:.1f}s ({duration/60:.1f} min)")
+    print(f"\nFeature matching completed in {duration:.1f}s ({duration/60:.1f} min)")
     
     # Step 3: Sparse Reconstruction
     print("\n" + "="*70)
@@ -357,7 +355,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     
     duration = (datetime.now() - start_time).total_seconds()
     
-    print(f"\n✓ Mapper finished in {duration:.1f}s ({duration/60:.1f} min)")
+    print(f"\nMapper finished in {duration:.1f}s ({duration/60:.1f} min)")
     
     # Verify reconstruction actually succeeded
     print("\n" + "="*70)
@@ -366,7 +364,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     
     reconstruction_dirs = list(sparse_dir.glob("*"))
     if not reconstruction_dirs:
-        print("✗ ERROR: No reconstruction directories found")
+        print("ERROR: No reconstruction directories found")
         return False
     
     # Check the first reconstruction (usually "0")
@@ -376,7 +374,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     points_file = recon_dir / "points3D.bin"
     
     if not (cameras_file.exists() and images_file.exists() and points_file.exists()):
-        print(f"✗ ERROR: Reconstruction files missing in {recon_dir}")
+        print(f"ERROR: Reconstruction files missing in {recon_dir}")
         return False
     
     # Run model analyzer to get stats
@@ -402,26 +400,26 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
             elif 'Mean reprojection error:' in line:
                 reprojection_error = float(line.split(':')[1].strip().replace('px', ''))
         
-        print(f"\n✓ Reconstruction succeeded!")
+        print(f"\nReconstruction succeeded!")
         print(f"  - Registered images: {registered_images} (out of {num_images})")
         print(f"  - 3D points: {points:,}")
         print(f"  - Mean reprojection error: {reprojection_error:.2f}px")
         
         if registered_images < 10:
-            print(f"\n⚠ WARNING: Only {registered_images} images registered")
+            print(f"\nWARNING: Only {registered_images} images registered")
             print("  This may indicate:")
             print("  - Images don't overlap enough")
             print("  - Images are too spread out geographically")
             print("  - Consider downloading images from a smaller, denser area")
         
         if reprojection_error > 2.0:
-            print(f"\n⚠ WARNING: High reprojection error ({reprojection_error:.2f}px)")
+            print(f"\nWARNING: High reprojection error ({reprojection_error:.2f}px)")
             print("  Reconstruction may be inaccurate")
         
         return True
         
     except Exception as e:
-        print(f"⚠ WARNING: Could not verify reconstruction: {e}")
+        print(f"WARNING: Could not verify reconstruction: {e}")
         print("  But reconstruction files exist, so likely succeeded")
         return True
 
@@ -448,7 +446,7 @@ def create_summary(output_dir: Path, images_dir: Path, total_duration: float):
     with open(summary_file, "w") as f:
         json.dump(summary, f, indent=2)
     
-    print(f"\n✓ Summary saved to {summary_file}")
+    print(f"\nSummary saved to {summary_file}")
     
     print("\n" + "="*70)
     print("PROCESSING SUMMARY")
@@ -477,11 +475,11 @@ def compress_output(output_dir: Path):
     result = subprocess.run(cmd)
     
     if result.returncode != 0:
-        print("✗ ERROR: Failed to compress output")
+        print("ERROR: Failed to compress output")
         return False
     
     size_mb = output_archive.stat().st_size / (1024 * 1024)
-    print(f"✓ Compressed to {output_archive} ({size_mb:.1f} MB)")
+    print(f"Compressed to {output_archive} ({size_mb:.1f} MB)")
     return True
 
 
@@ -532,7 +530,7 @@ Examples:
     
     # Step 1: Check system
     if not check_system():
-        print("⚠ System check had warnings, but continuing...")
+        print("System check had warnings, but continuing...")
     
     # Steps 2-4: Build COLMAP (unless skipped)
     if not args.skip_build:
@@ -543,11 +541,11 @@ Examples:
             return 1
         
         if not verify_cuda_colmap():
-            print("⚠ CUDA verification failed, but attempting to continue...")
+            print("CUDA verification failed, but attempting to continue...")
     else:
-        print("\n✓ Skipping build (--skip-build)")
+        print("Skipping build (--skip-build)")
         if not verify_cuda_colmap():
-            print("✗ ERROR: COLMAP not found or doesn't have CUDA")
+            print("ERROR: COLMAP not found or doesn't have CUDA")
             print("  Remove --skip-build to build COLMAP first")
             return 1
     
@@ -573,7 +571,7 @@ Examples:
         create_summary(args.output, args.images, total_duration)
         
         if not compress_output(args.output):
-            print("\n⚠ WARNING: Failed to compress output, but processing succeeded")
+            print("WARNING: Failed to compress output, but processing succeeded")
         
         print("\n" + "="*70)
         print("ALL DONE!")
