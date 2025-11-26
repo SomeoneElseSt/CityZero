@@ -11,9 +11,10 @@ import shutil
 from pathlib import Path
 import yt_dlp
 
-# Constants
-OUTPUT_DIR = "../outputs/youtube_train"
-TEMP_VIDEO_PATH = "temp_video.mp4"
+# Constants - paths relative to script location
+SCRIPT_DIR = Path(__file__).parent.resolve()
+OUTPUT_DIR = str((SCRIPT_DIR / "../outputs/youtube_train").resolve())
+TEMP_VIDEO_PATH = str((SCRIPT_DIR / "temp_video.mp4").resolve())
 FFMPEG_FRAME_PATTERN = "frame_%06d.jpg"
 
 
@@ -139,6 +140,9 @@ def main() -> int:
     if not download_video(video_url, TEMP_VIDEO_PATH):
         cleanup_temp_file(TEMP_VIDEO_PATH)
         return 1
+
+    print("\nStarting video frame extraction now - your laptop's fans may spin up quickly.")
+    print("This is normal. You can monitor CPU usage with sudo asitop or htop depending on which you have installed.\n")
 
     if not extract_frames(TEMP_VIDEO_PATH, OUTPUT_DIR):
         cleanup_temp_file(TEMP_VIDEO_PATH)
