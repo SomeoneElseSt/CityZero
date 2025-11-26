@@ -270,15 +270,44 @@ def build_colmap_cuda():
     return True
 
 
+def get_colmap_path():
+    """Get the path to COLMAP executable."""
+    # Check if COLMAP is in PATH
+    colmap_path = shutil.which("colmap")
+    
+    # If not in PATH, check common installation locations
+    if not colmap_path:
+        common_paths = [
+            "/usr/local/bin/colmap",
+            "/usr/bin/colmap",
+            str(Path.home() / "colmap_cuda" / "build" / "src" / "colmap" / "exe" / "colmap"),
+        ]
+        for path in common_paths:
+            if Path(path).exists():
+                colmap_path = path
+                break
+    
+    if not colmap_path:
+        return None
+    
+    print(f"Using COLMAP at: {colmap_path}")
+    return colmap_path
+
+
 def verify_cuda_colmap():
     """Verify that COLMAP was built with CUDA support."""
     print("\n" + "="*70)
     print("VERIFYING CUDA SUPPORT")
     print("="*70)
     
+    colmap_path = get_colmap_path()
+    if not colmap_path:
+        print("ERROR: COLMAP executable not found")
+        return False
+    
     try:
         result = subprocess.run(
-            ["colmap", "-h"],
+            [colmap_path, "-h"],
             capture_output=True,
             text=True,
             check=True
@@ -307,6 +336,12 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("RUNNING COLMAP WITH CUDA ACCELERATION")
     print("="*70)
     
+    # Get COLMAP path
+    colmap_path = get_colmap_path()
+    if not colmap_path:
+        print("ERROR: COLMAP executable not found")
+        return False
+    
     # Validate inputs
     if not images_dir.exists():
         print(f"ERROR: Images directory does not exist: {images_dir}")
@@ -331,7 +366,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("="*70)
     
     feat_cmd = [
-        "colmap", "feature_extractor",
+        colmap_path, "feature_extractor",
         "--image_path", str(images_dir),
         "--database_path", str(database_path),
         "--ImageReader.camera_model", "OPENCV",
@@ -351,6 +386,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("\nExtracting features with CUDA...")
     print("Expected GPU utilization: 80-95%")
     print("Monitor with: watch -n 2 nvidia-smi")
+    print(f"\nCommand: {' '.join(feat_cmd)}")
     start_time = datetime.now()
     
     result = subprocess.run(feat_cmd, env=env)
@@ -372,7 +408,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("="*70)
     
     match_cmd = [
-        "colmap", "exhaustive_matcher",
+        colmap_path, "exhaustive_matcher",
         "--database_path", str(database_path),
         "--FeatureMatching.use_gpu", "1",
         "--FeatureMatching.gpu_index", "0",
@@ -382,6 +418,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     
     print("\nMatching features with CUDA...")
     print("Expected GPU utilization: 80-95%")
+    print(f"\nCommand: {' '.join(match_cmd)}")
     start_time = datetime.now()
     
     result = subprocess.run(match_cmd, env=env)
@@ -403,7 +440,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("="*70)
     
     mapper_cmd = [
-        "colmap", "mapper",
+        colmap_path, "mapper",
         "--database_path", str(database_path),
         "--image_path", str(images_dir),
         "--output_path", str(sparse_dir),
@@ -443,7 +480,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     # Run model analyzer to get stats
     try:
         analyzer_result = subprocess.run(
-            ["colmap", "model_analyzer", "--path", str(recon_dir)],
+            [colmap_path, "model_analyzer", "--path", str(recon_dir)],
             capture_output=True,
             text=True,
             env=env
