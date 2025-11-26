@@ -2,39 +2,39 @@
 
 ## Basic Usage
 
-**Important**: Use `uv run` to automatically activate the virtual environment!
+**Important**: Use `uv run` to automatically activate the virtual environment and `python -m cityzero.mapillary_downloader` to run the downloader as a module.
 
 ### Download a predefined city
 ```bash
-uv run python download_images.py --city "San Francisco"
+uv run python -m cityzero.mapillary_downloader --city "San Francisco"
 ```
 
 ### Custom area (using coordinates)
 ```bash
-uv run python download_images.py --bbox "west,south,east,north"
+uv run python -m cityzero.mapillary_downloader --bbox "west,south,east,north"
 # Example:
-uv run python download_images.py --bbox "-122.52,37.70,-122.35,37.83"
+uv run python -m cityzero.mapillary_downloader --bbox "-122.52,37.70,-122.35,37.83"
 ```
 
 ### Test with limited images
 ```bash
-uv run python download_images.py --city "San Francisco" --limit 100
+uv run python -m cityzero.mapillary_downloader --city "San Francisco" --limit 100
 ```
 
 ### Resume interrupted download
 ```bash
 # Just run the same command again - it auto-resumes
-uv run python download_images.py --city "San Francisco"
+uv run python -m cityzero.mapillary_downloader --city "San Francisco"
 ```
 
 ### Custom output directory
 ```bash
-uv run python download_images.py --city "Miami" --output-dir data/miami_images
+uv run python -m cityzero.mapillary_downloader --city "Miami" --output-dir data/miami_images
 ```
 
 ### List available cities
 ```bash
-uv run python download_images.py --list-cities
+uv run python -m cityzero.mapillary_downloader --list-cities
 ```
 
 ## Available Arguments

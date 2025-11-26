@@ -3,28 +3,28 @@
 
 Usage:
     # San Francisco (default)
-    python download_images.py
+    uv run python -m cityzero.mapillary_downloader
     
     # Custom city by name
-    python download_images.py --city "New York"
+    uv run python -m cityzero.mapillary_downloader --city "New York"
     
     # Custom bounding box
-    python download_images.py --bbox "-122.52,37.70,-122.35,37.83"
+    uv run python -m cityzero.mapillary_downloader --bbox "-122.52,37.70,-122.35,37.83"
     
     # With image limit (for testing)
-    python download_images.py --city "San Francisco" --limit 100
+    uv run python -m cityzero.mapillary_downloader --city "San Francisco" --limit 100
     
     # Resume interrupted download
-    python download_images.py  # Just run again, it auto-resumes
+    uv run python -m cityzero.mapillary_downloader  # Just run again, it auto-resumes
 """
 
 import argparse
 import sys
 from pathlib import Path
 
-from cityzero.config import get_mapillary_config, BoundingBox, RAW_DATA_DIR
-from cityzero.downloader import ImageDownloader
-from cityzero.mapillary_client import MapillaryClient
+from .config import get_mapillary_config, BoundingBox, RAW_DATA_DIR
+from .downloader import ImageDownloader
+from .mapillary_client import MapillaryClient
 
 
 # Predefined city bounding boxes (can be extended)
@@ -119,19 +119,19 @@ def main():
         epilog="""
 Examples:
   Download San Francisco (default):
-    python download_images.py
+    uv run python -m cityzero.mapillary_downloader
     
   Download a specific city:
-    python download_images.py --city "New York"
+    uv run python -m cityzero.mapillary_downloader --city "New York"
     
   Download with custom bounding box:
-    python download_images.py --bbox "-74.05,40.68,-73.91,40.88"
+    uv run python -m cityzero.mapillary_downloader --bbox "-74.05,40.68,-73.91,40.88"
     
   Limit download for testing:
-    python download_images.py --city "San Francisco" --limit 50
+    uv run python -m cityzero.mapillary_downloader --city "San Francisco" --limit 50
     
   Specify output directory:
-    python download_images.py --output-dir data/sf_images
+    uv run python -m cityzero.mapillary_downloader --output-dir data/sf_images
         """
     )
     
