@@ -43,47 +43,110 @@ from datetime import datetime
 import shutil
 
 
+def validate_nvidia_smi():
+    """Validate nvidia-smi is available and GPUs are detected."""
+    if not shutil.which("nvidia-smi"):
+        print("ERROR: nvidia-smi not found in PATH")
+        return False
+
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--list-gpus"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5
+        )
+
+        if not result.stdout.strip():
+            print("ERROR: No GPUs detected by nvidia-smi")
+            return False
+
+        gpu_lines = result.stdout.strip().split('\n')
+        print(f"Detected {len(gpu_lines)} GPU(s):")
+        for line in gpu_lines:
+            print(f"  {line}")
+
+        return True
+
+    except subprocess.TimeoutExpired:
+        print("ERROR: nvidia-smi timed out")
+        return False
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: nvidia-smi failed with exit code {e.returncode}")
+        if e.stderr:
+            print(f"  {e.stderr}")
+        return False
+    except Exception as e:
+        print(f"ERROR: nvidia-smi validation failed: {e}")
+        return False
+
+
+def get_gpu_info():
+    """Get detailed GPU information."""
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,driver_version,cuda_version", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5
+        )
+
+        if result.stdout.strip():
+            print(f"GPU Info: {result.stdout.strip()}")
+            return True
+
+        return False
+
+    except Exception:
+        return False
+
+
 def check_system():
     """Verify system requirements."""
     print("\n" + "="*70)
     print("COLMAP CUDA BUILD & GPU-ACCELERATED PREPROCESSING SCRIPT")
     print("="*70)
-    
-    # Check GPU
-    try:
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,driver_version,cuda_version", "--format=csv,noheader"],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            print(f"GPU: {result.stdout.strip()}")
-        else:
-            print("WARNING: nvidia-smi failed, but continuing...")
-    except:
-        print("WARNING: nvidia-smi not accessible, but continuing...")
-    
-    # Check CUDA
-    try:
-        result = subprocess.run(["nvcc", "--version"], capture_output=True, text=True)
-        if result.returncode == 0:
-            print("CUDA compiler available")
-        else:
-            print("WARNING: nvcc not found - will be available after dependencies")
-    except:
-        print("WARNING: nvcc not found - will be available after dependencies")
-    
+
+    if not validate_nvidia_smi():
+        print("\nERROR: GPU validation failed")
+        print("This script requires an NVIDIA GPU with working drivers")
+        return False
+
+    get_gpu_info()
+
+    # Check CUDA compiler
+    if shutil.which("nvcc"):
+        try:
+            result = subprocess.run(
+                ["nvcc", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                print("CUDA compiler available")
+        except Exception:
+            pass
+    else:
+        print("CUDA compiler not found - will be available after dependencies")
+
     # Check Ubuntu version
     try:
         with open("/etc/os-release") as f:
             content = f.read()
             if "24.04" in content:
                 print("Ubuntu 24.04 detected")
+            elif "22.04" in content:
+                print("Ubuntu 22.04 detected")
+            elif "20.04" in content:
+                print("WARNING: Ubuntu 20.04 - may have compatibility issues")
             else:
-                print("WARNING: Not Ubuntu 24.04, may have compatibility issues")
-    except:
+                print("WARNING: Ubuntu version unknown - may have compatibility issues")
+    except Exception:
         pass
-    
+
     return True
 
 
@@ -530,7 +593,9 @@ Examples:
     
     # Step 1: Check system
     if not check_system():
-        print("System check had warnings, but continuing...")
+        print("\nERROR: System check failed")
+        print("Cannot proceed without valid GPU setup")
+        return 1
     
     # Steps 2-4: Build COLMAP (unless skipped)
     if not args.skip_build:
