@@ -330,7 +330,7 @@ def verify_cuda_colmap():
         return False
 
 
-def run_colmap_pipeline(images_dir: Path, output_dir: Path):
+def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequential"):
     """Run full COLMAP pipeline with CUDA acceleration."""
     print("\n" + "="*70)
     print("RUNNING COLMAP WITH CUDA ACCELERATION")
@@ -393,15 +393,34 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("\n" + "="*70)
     print("STEP 2/3: FEATURE MATCHING (GPU-ACCELERATED)")
     print("="*70)
+    print(f"Using {matcher.upper()} matcher")
     
-    match_cmd = [
-        "/usr/local/bin/colmap", "exhaustive_matcher",
-        "--database_path", str(database_path),
-        "--FeatureMatching.use_gpu", "1",
-        "--FeatureMatching.gpu_index", "0",
-        "--FeatureMatching.guided_matching", "1",
-        "--FeatureMatching.max_num_matches", "32768",  # Reduced from 65536 to fit GPU memory
-    ]
+    if matcher == "sequential":
+        match_cmd = [
+            "/usr/local/bin/colmap", "sequential_matcher",
+            "--database_path", str(database_path),
+            "--FeatureMatching.use_gpu", "1",
+            "--FeatureMatching.gpu_index", "0",
+            "--SequentialMatching.overlap", "50",
+            "--SequentialMatching.loop_detection", "1",
+            "--FeatureMatching.max_num_matches", "32768",
+        ]
+    elif matcher == "exhaustive":
+        match_cmd = [
+            "/usr/local/bin/colmap", "exhaustive_matcher",
+            "--database_path", str(database_path),
+            "--FeatureMatching.use_gpu", "1",
+            "--FeatureMatching.gpu_index", "0",
+            "--FeatureMatching.guided_matching", "1",
+            "--FeatureMatching.max_num_matches", "32768",
+        ]
+    elif matcher == "vocab_tree":
+        print("ERROR: vocab_tree matcher requires vocabulary tree file")
+        print("Download from: https://demuc.de/colmap/")
+        return False
+    else:
+        print(f"ERROR: Unknown matcher: {matcher}")
+        return False
     
     print("\nMatching features with CUDA...")
     print("Expected GPU utilization: 80-95%")
@@ -604,6 +623,13 @@ Examples:
         action="store_true",
         help="Skip COLMAP build (use if already built)"
     )
+    parser.add_argument(
+        "--matcher",
+        type=str,
+        choices=["sequential", "exhaustive", "vocab_tree"],
+        default="sequential",
+        help="Feature matching strategy (default: sequential). Use 'sequential' for video frames, 'exhaustive' for unordered images"
+    )
     
     args = parser.parse_args()
     
@@ -648,7 +674,7 @@ Examples:
     
     # Step 5: Run preprocessing if images provided
     if args.images and args.output:
-        if not run_colmap_pipeline(args.images, args.output):
+        if not run_colmap_pipeline(args.images, args.output, args.matcher):
             print("\n" + "="*70)
             print("PIPELINE FAILED")
             print("="*70)

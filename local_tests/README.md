@@ -41,6 +41,32 @@ Testing 3D reconstruction pipeline on Financial District subset (2,998 images) b
 
 This section outlines the workflow for running COLMAP with CUDA on Lambda Cloud, including steps for initial setup and reusing the pipeline for new datasets.
 
+### Feature Matching Strategy
+
+COLMAP's performance depends critically on the matching strategy. Choose based on data type:
+
+**Sequential Matcher** (default)
+- For: Video frames, drone footage, sequential captures
+- Behavior: Matches each image to N nearest neighbors in sequence
+- Complexity: O(N)
+- Time: ~30-60 min for 17K frames
+- Flag: `--matcher sequential`
+
+**Exhaustive Matcher**
+- For: Unordered images (Mapillary, street photos)
+- Behavior: Compares every image to every other image
+- Complexity: O(N²)
+- Time: ~1-2 hours for 3K images; impractical for 10K+ (days/weeks)
+- Flag: `--matcher exhaustive`
+
+**Vocab Tree Matcher**
+- For: Large (50K+) unordered collections
+- Behavior: Visual vocabulary for efficient matching
+- Requires: Pre-trained vocab tree file
+- Flag: `--matcher vocab_tree`
+
+Sequential is default. Exhaustive on 17K images would take ~40 days vs <1 hour with sequential.
+
 ### 1. Launch Instance
 - Image: Lambda Stack (Ubuntu 24.04)
 - GPU: A100 (40GB) @ $1.10/hour
@@ -71,7 +97,11 @@ tar -xzf images.tar.gz
 
 # Run the COLMAP pipeline. For the first run, it will build COLMAP with CUDA.
 # For subsequent runs with new datasets, use --skip-build.
+# Default matcher is 'sequential' (good for video frames)
 python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_output
+
+# For unordered images (Mapillary, random photos), use exhaustive matcher:
+# python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_output --matcher exhaustive
 
 # To process another dataset after COLMAP is built:
 # python3 lambda_build_colmap_cuda.py --images ~/new_dataset_images --output ~/new_dataset_output --skip-build
