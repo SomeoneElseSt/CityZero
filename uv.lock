@@ -95,6 +95,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "tqdm" },
+    { name = "yt-dlp" },
 ]
 
 [package.metadata]
@@ -105,6 +106,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "tqdm", specifier = ">=4.67.1" },
+    { name = "yt-dlp", specifier = ">=2025.11.12" },
 ]
 
 [[package]]
@@ -606,4 +608,13 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5f/66/56b8f7eab94b62e7ce1622a0788a81ee0282e022716b0c26f482a4f242f5/vt2geojson-0.2.1.tar.gz", hash = "sha256:bba39788ed8f019e8d30cedc9cefe8f4c8cb51c5e4906349fe1929d48a5092e2", size = 10774, upload-time = "2021-05-31T12:20:29.658Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ca/59/ecc3e402c102abadb7fbc742d126afedbf3bb36038cf92b4ac5472479e7f/vt2geojson-0.2.1-py3-none-any.whl", hash = "sha256:7da0b1f9f7020769c50bf8371a4f7db84297adb7ec1ef7dc7afc9d322cac6def", size = 6977, upload-time = "2021-05-31T12:20:27.221Z" },
+]
+
+[[package]]
+name = "yt-dlp"
+version = "2025.11.12"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/41/53ad8c6e74d6627bd598dfbb8ad7c19d5405e438210ad0bbaf1b288387e7/yt_dlp-2025.11.12.tar.gz", hash = "sha256:5f0795a6b8fc57a5c23332d67d6c6acf819a0b46b91a6324bae29414fa97f052", size = 3076928, upload-time = "2025-11-12T01:00:38.43Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5f/16/fdebbee6473473a1c0576bd165a50e4a70762484d638c1d59fa9074e175b/yt_dlp-2025.11.12-py3-none-any.whl", hash = "sha256:b47af37bbb16b08efebb36825a280ea25a507c051f93bf413a6e4a0e586c6e79", size = 3279151, upload-time = "2025-11-12T01:00:35.813Z" },
 ]
