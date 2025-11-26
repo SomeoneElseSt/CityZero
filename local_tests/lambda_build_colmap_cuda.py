@@ -400,7 +400,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
         "--FeatureMatching.use_gpu", "1",
         "--FeatureMatching.gpu_index", "0",
         "--FeatureMatching.guided_matching", "1",
-        "--FeatureMatching.max_num_matches", "65536",
+        "--FeatureMatching.max_num_matches", "32768",  # Reduced from 65536 to fit GPU memory
     ]
     
     print("\nMatching features with CUDA...")
@@ -438,7 +438,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("Note: COLMAP may print warnings but still succeed - we'll verify after")
     start_time = datetime.now()
     
-    result = subprocess.run(mapper_cmd, env=env)
+    result = subprocess.run(mapper_cmd)
     
     duration = (datetime.now() - start_time).total_seconds()
     
