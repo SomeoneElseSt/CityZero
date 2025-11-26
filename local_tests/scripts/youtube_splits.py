@@ -13,9 +13,11 @@ import yt_dlp
 
 # Constants - paths relative to script location
 SCRIPT_DIR = Path(__file__).parent.resolve()
-OUTPUT_DIR = str((SCRIPT_DIR / "../outputs/youtube_train").resolve())
+YOUTUBE_TRAIN_DIR = str((SCRIPT_DIR / "../outputs/youtube_train").resolve())
+OUTPUT_DIR = str((SCRIPT_DIR / "../outputs/youtube_train/images").resolve())
 TEMP_VIDEO_PATH = str((SCRIPT_DIR / "temp_video.mp4").resolve())
 FFMPEG_FRAME_PATTERN = "frame_%06d.jpg"
+BYTES_PER_MB = 1024 * 1024
 
 
 def validate_args() -> str | None:
@@ -125,6 +127,43 @@ def cleanup_temp_file(file_path: str) -> None:
         print(f"Warning: Failed to clean up temporary file: {e}")
 
 
+def compress_images(youtube_train_dir: str, images_dir: str) -> bool:
+    """Compress images folder into tar.gz archive."""
+    archive_path = os.path.join(youtube_train_dir, "images.tar.gz")
+
+    if not os.path.exists(images_dir):
+        print(f"Error: Images directory does not exist: {images_dir}")
+        return False
+
+    print(f"\nCompressing images to: {archive_path}")
+    print("This may take a few minutes depending on the number of frames...")
+
+    tar_cmd = [
+        "tar",
+        "-czf",
+        archive_path,
+        "-C", youtube_train_dir,
+        "-v",
+        "images"
+    ]
+
+    result = subprocess.run(tar_cmd, capture_output=False)
+
+    if result.returncode != 0:
+        print(f"Error: tar command failed with exit code {result.returncode}")
+        return False
+
+    if not os.path.exists(archive_path):
+        print("Error: Archive creation failed - file not created")
+        return False
+
+    archive_size_mb = os.path.getsize(archive_path) / BYTES_PER_MB
+    print(f"\nCompression complete!")
+    print(f"Archive size: {archive_size_mb:.1f} MB")
+    print(f"Location: {archive_path}")
+    return True
+
+
 def main() -> int:
     """Main execution function."""
     video_url = validate_args()
@@ -149,7 +188,15 @@ def main() -> int:
         return 1
 
     cleanup_temp_file(TEMP_VIDEO_PATH)
+
+    if not compress_images(YOUTUBE_TRAIN_DIR, OUTPUT_DIR):
+        print("\nWarning: Compression failed, but frames were extracted successfully")
+        print(f"Frames location: {OUTPUT_DIR}")
+        return 0
+
     print("\nProcess completed successfully!")
+    print(f"Frames saved to: {OUTPUT_DIR}")
+    print(f"Compressed archive: {YOUTUBE_TRAIN_DIR}/images.tar.gz")
     return 0
 
 
