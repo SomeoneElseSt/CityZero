@@ -2,33 +2,10 @@
 """
 COLMAP CUDA Build & GPU-Accelerated Preprocessing for Lambda Cloud
 
-This script autonomously handles everything needed to run GPU-accelerated 3D reconstruction
-on Lambda Cloud A100 instances. Battle-tested on Financial District dataset (2998 images).
-
-KEY LEARNINGS:
-- Lambda Stack's default COLMAP has NO CUDA support (CPU-only)
-- Must build COLMAP from source with CUDA flags (30-45 min one-time)
-- Flag names changed in COLMAP 3.14:
-  * Use --FeatureExtraction.use_gpu (not --SiftExtraction.use_gpu)
-  * Use --FeatureMatching.use_gpu (not --SiftMatching.use_gpu)
-- COLMAP prints scary warnings during mapper but still succeeds
-- Script verifies reconstruction by checking output files + stats
-
-PERFORMANCE (3K images, A100):
-- Build: 30-45 min (one-time)
-- Feature extraction: ~2 min (GPU, 80-95% utilization)
-- Feature matching: ~1 min (GPU, 80-95% utilization)
-- Mapper: 10-30 min (CPU-bound, low GPU usage is normal)
-- Total: ~45-80 min (vs 10 hours on M4 Mac)
-
-VALIDATED FOR:
-- Ubuntu 24.04 LTS
-- CUDA 12.x (Lambda Stack default)
-- A100 GPU (40GB)
-- Any unordered image dataset (Mapillary, custom, etc.)
+This script automates the process of building COLMAP with CUDA support and performing
+GPU-accelerated 3D reconstruction on Lambda Cloud A100 instances.
 
 USAGE:
-
   # Full pipeline (first time - builds COLMAP + processes images):
   python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_output
 
@@ -50,10 +27,10 @@ OUTPUT:
 - Automatically compressed for download
 
 NOTES:
-- Only subset of images may register (e.g., 54 of 2998) - normal for sparse street data
-- COLMAP warnings like "Could not register" are normal - script verifies success
-- Use tmux to prevent disconnection: tmux new -s colmap
-- Always terminate Lambda instance after download to stop billing
+- Only a subset of images may register (e.g., 54 of 2998) - this is normal for sparse street data.
+- COLMAP may print warnings like "Could not register" but still succeed; the script verifies success.
+- Use tmux to prevent disconnection: `tmux new -s colmap`.
+- Always terminate the Lambda instance after download to stop billing.
 """
 
 import argparse
