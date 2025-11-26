@@ -336,20 +336,14 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("RUNNING COLMAP WITH CUDA ACCELERATION")
     print("="*70)
     
-    # Get COLMAP path
-    colmap_path = get_colmap_path()
-    if not colmap_path:
-        print("ERROR: COLMAP executable not found")
-        return False
-    
     # Validate inputs
     if not images_dir.exists():
         print(f"ERROR: Images directory does not exist: {images_dir}")
         return False
     
-    num_images = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
+    num_images = len(list(images_dir.glob("*.jpg")))
     if num_images == 0:
-        print(f"ERROR: No .jpg or .png images found in {images_dir}")
+        print(f"ERROR: No .jpg images found in {images_dir}")
         return False
     
     print(f"Found {num_images} images")
@@ -366,7 +360,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("="*70)
     
     feat_cmd = [
-        colmap_path, "feature_extractor",
+        "/usr/local/bin/colmap", "feature_extractor",
         "--image_path", str(images_dir),
         "--database_path", str(database_path),
         "--ImageReader.camera_model", "OPENCV",
@@ -374,14 +368,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
         "--FeatureExtraction.use_gpu", "1",
         "--FeatureExtraction.gpu_index", "0",
         "--SiftExtraction.max_num_features", "16384",
-        "--SiftExtraction.estimate_affine_shape", "1",
-        "--SiftExtraction.domain_size_pooling", "1",
     ]
-    
-    # Environment for headless execution
-    env = dict(os.environ)
-    env["QT_QPA_PLATFORM"] = "offscreen"
-    env["DISPLAY"] = ""
     
     print("\nExtracting features with CUDA...")
     print("Expected GPU utilization: 80-95%")
@@ -389,7 +376,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print(f"\nCommand: {' '.join(feat_cmd)}")
     start_time = datetime.now()
     
-    result = subprocess.run(feat_cmd, env=env)
+    result = subprocess.run(feat_cmd)
     
     duration = (datetime.now() - start_time).total_seconds()
     
@@ -408,7 +395,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("="*70)
     
     match_cmd = [
-        colmap_path, "exhaustive_matcher",
+        "/usr/local/bin/colmap", "exhaustive_matcher",
         "--database_path", str(database_path),
         "--FeatureMatching.use_gpu", "1",
         "--FeatureMatching.gpu_index", "0",
@@ -421,7 +408,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print(f"\nCommand: {' '.join(match_cmd)}")
     start_time = datetime.now()
     
-    result = subprocess.run(match_cmd, env=env)
+    result = subprocess.run(match_cmd)
     
     duration = (datetime.now() - start_time).total_seconds()
     
@@ -440,7 +427,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     print("="*70)
     
     mapper_cmd = [
-        colmap_path, "mapper",
+        "/usr/local/bin/colmap", "mapper",
         "--database_path", str(database_path),
         "--image_path", str(images_dir),
         "--output_path", str(sparse_dir),
@@ -480,10 +467,9 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path):
     # Run model analyzer to get stats
     try:
         analyzer_result = subprocess.run(
-            [colmap_path, "model_analyzer", "--path", str(recon_dir)],
+            ["/usr/local/bin/colmap", "model_analyzer", "--path", str(recon_dir)],
             capture_output=True,
-            text=True,
-            env=env
+            text=True
         )
         
         # Parse output for key metrics
