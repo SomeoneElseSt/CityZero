@@ -8,6 +8,7 @@ import sys
 import os
 import subprocess
 import shutil
+import argparse
 from pathlib import Path
 import yt_dlp
 
@@ -20,14 +21,21 @@ FFMPEG_FRAME_PATTERN = "frame_%06d.jpg"
 BYTES_PER_MB = 1024 * 1024
 
 
-def validate_args() -> str | None:
-    """Validate command-line arguments and return video URL."""
-    if len(sys.argv) != 2:
-        print("Error: Exactly one argument required (YouTube video URL)")
-        print("Usage: python3 youtube_splits.py <youtube_url>")
-        return None
-
-    return sys.argv[1]
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Download YouTube video and extract frames"
+    )
+    parser.add_argument(
+        "url",
+        help="YouTube video URL"
+    )
+    parser.add_argument(
+        "--compress",
+        action="store_true",
+        help="Compress extracted frames into tar.gz archive (optional, JPEGs are already compressed)"
+    )
+    return parser.parse_args()
 
 
 def check_dependencies() -> bool:
@@ -166,9 +174,7 @@ def compress_images(youtube_train_dir: str, images_dir: str) -> bool:
 
 def main() -> int:
     """Main execution function."""
-    video_url = validate_args()
-    if not video_url:
-        return 1
+    args = parse_args()
 
     if not check_dependencies():
         return 1
@@ -176,7 +182,7 @@ def main() -> int:
     if not create_output_directory(OUTPUT_DIR):
         return 1
 
-    if not download_video(video_url, TEMP_VIDEO_PATH):
+    if not download_video(args.url, TEMP_VIDEO_PATH):
         cleanup_temp_file(TEMP_VIDEO_PATH)
         return 1
 
@@ -189,14 +195,20 @@ def main() -> int:
 
     cleanup_temp_file(TEMP_VIDEO_PATH)
 
-    if not compress_images(YOUTUBE_TRAIN_DIR, OUTPUT_DIR):
-        print("\nWarning: Compression failed, but frames were extracted successfully")
-        print(f"Frames location: {OUTPUT_DIR}")
-        return 0
+    if args.compress:
+        if not compress_images(YOUTUBE_TRAIN_DIR, OUTPUT_DIR):
+            print("\nWarning: Compression failed, but frames were extracted successfully")
+            print(f"Frames location: {OUTPUT_DIR}")
+            return 0
 
-    print("\nProcess completed successfully!")
-    print(f"Frames saved to: {OUTPUT_DIR}")
-    print(f"Compressed archive: {YOUTUBE_TRAIN_DIR}/images.tar.gz")
+        print("\nProcess completed successfully!")
+        print(f"Frames saved to: {OUTPUT_DIR}")
+        print(f"Compressed archive: {YOUTUBE_TRAIN_DIR}/images.tar.gz")
+    else:
+        print("\nProcess completed successfully!")
+        print(f"Frames saved to: {OUTPUT_DIR}")
+        print("(Compression skipped - use --compress flag to create archive)")
+
     return 0
 
 

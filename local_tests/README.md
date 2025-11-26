@@ -49,6 +49,8 @@ This section outlines the workflow for running COLMAP with CUDA on Lambda Cloud,
 
 ```bash
 # On your local machine: compress images and upload the script and images to Lambda
+# Note: tar compression (-z flag) is optional for JPEGs as they're already optimally compressed.
+# Use tar without -z for JPEGs (just bundling), or skip tar and scp the directory directly.
 tar -czf images.tar.gz financial_district/images/
 scp -i *.pem images.tar.gz lambda_build_colmap_cuda.py ubuntu@YOUR_IP:~/
 ```
