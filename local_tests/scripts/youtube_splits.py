@@ -9,6 +9,7 @@ import os
 import subprocess
 import shutil
 from pathlib import Path
+import yt_dlp
 
 # Constants
 OUTPUT_DIR = "../outputs/youtube_train"
