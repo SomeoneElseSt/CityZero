@@ -20,7 +20,7 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 MAPS_DATA_DIR = DATA_DIR / "maps"
 
 # Output directories
-OUTPUT_DIR = PROJECT_ROOT / "outputs"
+OUTPUT_DIR = PROJECT_ROOT / "local_tests" / "outputs"
 MODELS_OUTPUT_DIR = OUTPUT_DIR / "models"
 RENDERS_OUTPUT_DIR = OUTPUT_DIR / "renders"
 
