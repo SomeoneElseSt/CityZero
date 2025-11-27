@@ -402,7 +402,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequ
             "--FeatureMatching.use_gpu", "1",
             "--FeatureMatching.gpu_index", "0",
             "--SequentialMatching.overlap", "50",
-            "--SequentialMatching.loop_detection", "1",
+            "--SequentialMatching.loop_detection", "0",  # Disabled - vocab tree download is slow
             "--FeatureMatching.max_num_matches", "32768",
         ]
     elif matcher == "exhaustive":

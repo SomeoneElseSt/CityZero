@@ -24,11 +24,25 @@ BYTES_PER_MB = 1024 * 1024
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Download YouTube video and extract frames"
+        description="Download YouTube video and extract frames for COLMAP reconstruction",
+        epilog="""
+Frame rate recommendations for COLMAP:
+  - 10-15 fps: Dashcam/vehicle footage (recommended for moving scenes)
+  - 5 fps: Slow-moving scenes or static camera pans
+  - 1-2 fps: Very slow scenes with minimal motion
+
+Higher fps = better overlap but more frames to process.
+        """
     )
     parser.add_argument(
         "url",
         help="YouTube video URL"
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=15,
+        help="Frames per second to extract (default: 15, recommended for dashcam footage)"
     )
     parser.add_argument(
         "--compress",
@@ -90,19 +104,29 @@ def download_video(url: str, output_path: str) -> bool:
         return False
 
 
-def extract_frames(video_path: str, output_dir: str) -> bool:
-    """Extract frames from video using ffmpeg."""
+def extract_frames(video_path: str, output_dir: str, fps: int = 15) -> bool:
+    """Extract frames from video using ffmpeg.
+    
+    Args:
+        video_path: Path to input video file
+        output_dir: Directory to save extracted frames
+        fps: Frames per second to extract (default: 15)
+             - 10-15 fps recommended for dashcam/vehicle footage
+             - 5 fps is too sparse for moving vehicles (insufficient overlap)
+             - Higher fps = better overlap but more frames to process
+    """
     output_pattern = os.path.join(output_dir, FFMPEG_FRAME_PATTERN)
 
     ffmpeg_command = [
         "ffmpeg",
         "-i", video_path,
-        "-vf", "fps=5",  # fps extracts N frame per second (adjust as needed)
-        "-q:v", "2",      # Quality level (2 is high quality)
+        "-vf", f"fps={fps}",
+        "-q:v", "2",  # Quality level (2 is high quality)
         output_pattern
     ]
 
-    print("Extracting frames from video...")
+    print(f"Extracting frames from video at {fps} fps...")
+    print(f"Note: {fps} fps provides good overlap for COLMAP reconstruction from moving vehicles")
     try:
         result = subprocess.run(
             ffmpeg_command,
@@ -189,7 +213,7 @@ def main() -> int:
     print("\nStarting video frame extraction now - your laptop's fans may spin up quickly.")
     print("This is normal. You can monitor CPU usage with sudo asitop or htop depending on which you have installed.\n")
 
-    if not extract_frames(TEMP_VIDEO_PATH, OUTPUT_DIR):
+    if not extract_frames(TEMP_VIDEO_PATH, OUTPUT_DIR, fps=args.fps):
         cleanup_temp_file(TEMP_VIDEO_PATH)
         return 1
 
