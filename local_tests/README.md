@@ -49,14 +49,13 @@ COLMAP's performance depends critically on the matching strategy. Choose based o
 - For: Video frames, drone footage, sequential captures
 - Behavior: Matches each image to N nearest neighbors in sequence
 - Complexity: O(N)
-- Time: ~30-60 min for 17K frames
 - Flag: `--matcher sequential`
 
 **Exhaustive Matcher**
 - For: Unordered images (Mapillary, street photos)
 - Behavior: Compares every image to every other image
 - Complexity: O(N²)
-- Time: ~1-2 hours for 3K images; impractical for 10K+ (days/weeks)
+- Note: Impractical for large datasets (10K+ images)
 - Flag: `--matcher exhaustive`
 
 **Vocab Tree Matcher**
@@ -65,49 +64,83 @@ COLMAP's performance depends critically on the matching strategy. Choose based o
 - Requires: Pre-trained vocab tree file
 - Flag: `--matcher vocab_tree`
 
-Sequential is default. Exhaustive on 17K images would take ~40 days vs <1 hour with sequential.
+Sequential is default. Exhaustive scales poorly with large image counts.
 
 ### 1. Launch Instance
 - Image: Lambda Stack (Ubuntu 24.04)
-- GPU: A100 (40GB) @ $1.10/hour
+- GPU: A100 (40GB) recommended for COLMAP
 
-### 2. Upload Code and Images
+### 2. Upload Scripts to Lambda
 
+**Quick upload command** (uploads all necessary scripts):
 ```bash
-# On your local machine: compress images and upload the script and images to Lambda
-# Note: tar compression (-z flag) is optional for JPEGs as they're already optimally compressed.
-# Use tar without -z for JPEGs (just bundling), or skip tar and scp the directory directly.
-
-# Upload images
-scp -i *.pem YOUR-IMAGES-TAR-OR-DIR-PATH ubuntu@YOUR_IP:~/
-# Upload colmap script 
-scp -i *.pem lambda_build_colmap_cuda.py ubuntu@YOUR_IP:~/
-# Upload gsplat script 
-scp -i *.pem lambda_train_gsplat.py ubuntu@YOUR_IP:~/
-
-```scp -i *.pem  ubuntu@80.225.231.238:~/
-
-### 3. SSH into Lambda Instance and Run COLMAP
-
-```bash
-# On Lambda instance: SSH in, start a tmux session, and decompress images
-ssh -i *.pem ubuntu@YOUR_IP
-tmux new -s colmap
-tar -xzf images.tar.gz
-
-# Run the COLMAP pipeline. For the first run, it will build COLMAP with CUDA.
-# For subsequent runs with new datasets, use --skip-build.
-# Default matcher is 'sequential' (good for video frames)
-python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_output
-
-# For unordered images (Mapillary, random photos), use exhaustive matcher:
-# python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_output --matcher exhaustive
-
-# To process another dataset after COLMAP is built:
-# python3 lambda_build_colmap_cuda.py --images ~/new_dataset_images --output ~/new_dataset_output --skip-build
+# From local_tests directory, upload all scripts in one command:
+scp -i *.pem lambda_build_colmap_cuda.py lambda_train_gsplat.py scripts/youtube_splits_lambda.py scripts/cookies.txt ubuntu@YOUR_IP:~/
 ```
 
-### 4. Manual Commands (if script breaks between stages)
+**Alternative: Upload individually**
+```bash
+# Upload COLMAP script
+scp -i *.pem lambda_build_colmap_cuda.py ubuntu@YOUR_IP:~/
+
+# Upload Gaussian Splatting script 
+scp -i *.pem lambda_train_gsplat.py ubuntu@YOUR_IP:~/
+
+# Upload YouTube frame extraction script
+scp -i *.pem scripts/youtube_splits_lambda.py ubuntu@YOUR_IP:~/
+
+# Upload YouTube cookies (required for bot detection bypass)
+scp -i *.pem scripts/cookies.txt ubuntu@YOUR_IP:~/
+```
+
+**Note on cookies.txt:**
+- Required for YouTube downloads on Lambda (bypasses bot detection)
+- Export from browser using "Get cookies.txt LOCALLY" extension (Chrome/Firefox)
+- Never commit to git (already in .gitignore)
+
+### 3. SSH into Lambda Instance
+
+```bash
+ssh -i *.pem ubuntu@YOUR_IP
+tmux new -s processing  # Use tmux to prevent disconnection
+```
+
+### 4. Extract Frames from YouTube Video (Optional)
+
+If downloading video directly on Lambda (recommended to avoid large uploads):
+
+```bash
+# On Lambda instance:
+python3 youtube_splits_lambda.py "YOUTUBE_URL" --fps 15 --cookies ~/cookies.txt
+
+# Outputs to ~/youtube_train/images/
+```
+
+**Alternative: Upload pre-extracted frames**
+If you already have frames extracted locally:
+```bash
+# On local machine (compress for faster upload):
+tar -cJf images.tar.xz -C outputs/youtube_train images
+scp -i *.pem images.tar.xz ubuntu@YOUR_IP:~/
+
+# On Lambda:
+tar -xJf images.tar.xz
+```
+
+### 5. Run COLMAP Pipeline
+
+```bash
+# First run (builds COLMAP with CUDA):
+python3 lambda_build_colmap_cuda.py --images ~/youtube_train/images --output ~/colmap_output
+
+# Subsequent runs (skip build):
+python3 lambda_build_colmap_cuda.py --images ~/youtube_train/images --output ~/colmap_output --skip-build
+
+# For unordered images (Mapillary), use exhaustive matcher:
+# python3 lambda_build_colmap_cuda.py --images ~/images --output ~/colmap_output --matcher exhaustive
+```
+
+### 6. Manual Commands (if script breaks between stages)
 
 If the automated script fails at any stage, you can resume manually using these commands:
 
@@ -134,7 +167,7 @@ colmap mapper \
   --output_path ~/colmap_output/sparse
 ```
 
-### 5. Download Output and Train Locally
+### 7. Download Output and Train Locally
 
 ```bash
 # On Lambda instance: compress the COLMAP output
