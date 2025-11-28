@@ -244,6 +244,7 @@ def install_dependencies():
         "numpy",          # Numerical operations
         "scipy",          # Scientific computing
         "imageio",        # Image I/O for training script
+        "tyro",           # CLI argument parsing for training script
     ]
 
     pip_cmd = [sys.executable, "-m", "pip", "install"] + gsplat_packages
