@@ -272,10 +272,16 @@ def install_dependencies():
     else:
         print(f"gsplat repository already exists at {gsplat_repo}")
 
-    # Install example requirements
+    # Install example requirements (torch first for fused-ssim build dependency)
     print("\nInstalling example requirements...")
     requirements_file = gsplat_repo / "examples" / "requirements.txt"
     if requirements_file.exists():
+        # Install torch first (required for fused-ssim compilation)
+        print("Installing torch first (required for other packages)...")
+        torch_cmd = [sys.executable, "-m", "pip", "install", "torch", "torchvision"]
+        subprocess.run(torch_cmd, check=True)
+        
+        # Then install remaining requirements
         pip_cmd = [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)]
         subprocess.run(pip_cmd, check=True)
         print("Example requirements installed")
