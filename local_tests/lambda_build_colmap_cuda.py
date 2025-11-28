@@ -330,7 +330,7 @@ def verify_cuda_colmap():
         return False
 
 
-def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequential"):
+def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequential", skip_extraction: bool = False, skip_matching: bool = False):
     """Run full COLMAP pipeline with CUDA acceleration."""
     print("\n" + "="*70)
     print("RUNNING COLMAP WITH CUDA ACCELERATION")
@@ -354,58 +354,119 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequ
     sparse_dir = output_dir / "sparse"
     sparse_dir.mkdir(exist_ok=True)
     
+    # Handle database cleanup for re-running steps
+    if skip_extraction and not skip_matching:
+        # Re-running matching requires clearing cached matches
+        if database_path.exists():
+            print("\n" + "="*70)
+            print("DATABASE CLEANUP REQUIRED")
+            print("="*70)
+            print("To re-run feature matching with new parameters (e.g., overlap),")
+            print("the existing matches in the database must be removed.")
+            print(f"\nThis will delete: {database_path}")
+            print("Feature extraction results will be preserved if you re-extract.")
+            response = input("\nProceed with deletion? [y/N]: ").strip().lower()
+            if response == 'y':
+                database_path.unlink()
+                print("Database deleted. Will re-run feature extraction and matching.")
+                skip_extraction = False  # Must re-extract if deleting database
+            else:
+                print("Aborted. No changes made.")
+                return False
+    
+    if not skip_extraction and database_path.exists():
+        # Starting from scratch but database exists
+        print("\n" + "="*70)
+        print("EXISTING DATABASE DETECTED")
+        print("="*70)
+        print(f"Found existing database: {database_path}")
+        print("Starting feature extraction will overwrite existing features.")
+        response = input("\nDelete existing database and start fresh? [y/N]: ").strip().lower()
+        if response == 'y':
+            database_path.unlink()
+            print("Database deleted.")
+        else:
+            print("Keeping existing database and skipping extraction.")
+            skip_extraction = True
+    
     # Step 1: Feature Extraction (CUDA)
-    print("\n" + "="*70)
-    print("STEP 1/3: FEATURE EXTRACTION (GPU-ACCELERATED)")
-    print("="*70)
-    
-    feat_cmd = [
-        "/usr/local/bin/colmap", "feature_extractor",
-        "--image_path", str(images_dir),
-        "--database_path", str(database_path),
-        "--ImageReader.camera_model", "OPENCV",
-        "--ImageReader.single_camera", "0",
-        "--FeatureExtraction.use_gpu", "1",
-        "--FeatureExtraction.gpu_index", "0",
-        "--SiftExtraction.max_num_features", "16384",
-    ]
-    
-    print("\nExtracting features with CUDA...")
-    print("Expected GPU utilization: 80-95%")
-    print("Monitor with: watch -n 2 nvidia-smi")
-    print(f"\nCommand: {' '.join(feat_cmd)}")
-    start_time = datetime.now()
-    
-    result = subprocess.run(feat_cmd)
-    
-    duration = (datetime.now() - start_time).total_seconds()
-    
-    if result.returncode != 0:
-        print(f"\nERROR: Feature extraction failed")
-        print("\nPossible fixes:")
-        print("  1. Check flags with: colmap feature_extractor --help | grep gpu")
-        print("  2. Verify COLMAP has CUDA: colmap -h | grep CUDA")
-        return False
-    
-    print(f"\nFeature extraction completed in {duration:.1f}s ({duration/60:.1f} min)")
+    if skip_extraction:
+        print("\n" + "="*70)
+        print("STEP 1/3: FEATURE EXTRACTION (SKIPPED)")
+        print("="*70)
+        print("Reusing existing features from database")
+        if not database_path.exists():
+            print(f"ERROR: Database not found at {database_path}")
+            print("Cannot skip extraction without existing database")
+            return False
+    else:
+        print("\n" + "="*70)
+        print("STEP 1/3: FEATURE EXTRACTION (GPU-ACCELERATED)")
+        print("="*70)
+        
+        feat_cmd = [
+            "/usr/local/bin/colmap", "feature_extractor",
+            "--image_path", str(images_dir),
+            "--database_path", str(database_path),
+            "--ImageReader.camera_model", "OPENCV",
+            "--ImageReader.single_camera", "0",
+            "--FeatureExtraction.use_gpu", "1",
+            "--FeatureExtraction.gpu_index", "0",
+            "--SiftExtraction.max_num_features", "16384",
+        ]
+        
+        print("\nExtracting features with CUDA...")
+        print("Expected GPU utilization: 80-95%")
+        print("Monitor with: watch -n 2 nvidia-smi")
+        print(f"\nCommand: {' '.join(feat_cmd)}")
+        start_time = datetime.now()
+        
+        result = subprocess.run(feat_cmd)
+        
+        duration = (datetime.now() - start_time).total_seconds()
+        
+        if result.returncode != 0:
+            print(f"\nERROR: Feature extraction failed")
+            print("\nPossible fixes:")
+            print("  1. Check flags with: colmap feature_extractor --help | grep gpu")
+            print("  2. Verify COLMAP has CUDA: colmap -h | grep CUDA")
+            return False
+        
+        print(f"\nFeature extraction completed in {duration:.1f}s ({duration/60:.1f} min)")
     
     # Step 2: Feature Matching (CUDA)
-    print("\n" + "="*70)
-    print("STEP 2/3: FEATURE MATCHING (GPU-ACCELERATED)")
-    print("="*70)
-    print(f"Using {matcher.upper()} matcher")
+    if skip_matching:
+        print("\n" + "="*70)
+        print("STEP 2/3: FEATURE MATCHING (SKIPPED)")
+        print("="*70)
+        print("Reusing existing matches from database")
+        if not database_path.exists():
+            print(f"ERROR: Database not found at {database_path}")
+            print("Cannot skip matching without existing database")
+            return False
+    else:
+        print("\n" + "="*70)
+        print("STEP 2/3: FEATURE MATCHING (GPU-ACCELERATED)")
+        print("="*70)
+        print(f"Using {matcher.upper()} matcher")
     
-    if matcher == "sequential":
+    if not skip_matching and matcher == "sequential":
+        # Adjust overlap based on dataset size and frame rate
+        # 15 fps video: frames are ~0.5-1m apart at 30mph
+        # Overlap=300 matches each frame to next 300 frames (~300m of road)
+        # Higher overlap needed for fast-moving dashcam footage
+        overlap = "300"
+        
         match_cmd = [
             "/usr/local/bin/colmap", "sequential_matcher",
             "--database_path", str(database_path),
             "--FeatureMatching.use_gpu", "1",
             "--FeatureMatching.gpu_index", "0",
-            "--SequentialMatching.overlap", "50",
+            "--SequentialMatching.overlap", overlap,
             "--SequentialMatching.loop_detection", "0",  # Disabled - vocab tree download is slow
             "--FeatureMatching.max_num_matches", "32768",
         ]
-    elif matcher == "exhaustive":
+    elif not skip_matching and matcher == "exhaustive":
         match_cmd = [
             "/usr/local/bin/colmap", "exhaustive_matcher",
             "--database_path", str(database_path),
@@ -414,31 +475,32 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequ
             "--FeatureMatching.guided_matching", "1",
             "--FeatureMatching.max_num_matches", "32768",
         ]
-    elif matcher == "vocab_tree":
+    elif not skip_matching and matcher == "vocab_tree":
         print("ERROR: vocab_tree matcher requires vocabulary tree file")
         print("Download from: https://demuc.de/colmap/")
         return False
-    else:
+    elif not skip_matching:
         print(f"ERROR: Unknown matcher: {matcher}")
         return False
     
-    print("\nMatching features with CUDA...")
-    print("Expected GPU utilization: 80-95%")
-    print(f"\nCommand: {' '.join(match_cmd)}")
-    start_time = datetime.now()
-    
-    result = subprocess.run(match_cmd)
-    
-    duration = (datetime.now() - start_time).total_seconds()
-    
-    if result.returncode != 0:
-        print(f"\nERROR: Feature matching failed")
-        print("\nPossible fixes:")
-        print("  1. Check flags with: colmap exhaustive_matcher --help | grep gpu")
-        print("  2. Try without guided_matching flag")
-        return False
-    
-    print(f"\nFeature matching completed in {duration:.1f}s ({duration/60:.1f} min)")
+    if not skip_matching:
+        print("\nMatching features with CUDA...")
+        print("Expected GPU utilization: 80-95%")
+        print(f"\nCommand: {' '.join(match_cmd)}")
+        start_time = datetime.now()
+        
+        result = subprocess.run(match_cmd)
+        
+        duration = (datetime.now() - start_time).total_seconds()
+        
+        if result.returncode != 0:
+            print(f"\nERROR: Feature matching failed")
+            print("\nPossible fixes:")
+            print("  1. Check flags with: colmap exhaustive_matcher --help | grep gpu")
+            print("  2. Try without guided_matching flag")
+            return False
+        
+        print(f"\nFeature matching completed in {duration:.1f}s ({duration/60:.1f} min)")
     
     # Step 3: Sparse Reconstruction
     print("\n" + "="*70)
@@ -630,6 +692,16 @@ Examples:
         default="sequential",
         help="Feature matching strategy (default: sequential). Use 'sequential' for video frames, 'exhaustive' for unordered images"
     )
+    parser.add_argument(
+        "--skip-extraction",
+        action="store_true",
+        help="Skip feature extraction (reuse existing features in database)"
+    )
+    parser.add_argument(
+        "--skip-matching",
+        action="store_true",
+        help="Skip feature matching (reuse existing matches in database)"
+    )
     
     args = parser.parse_args()
     
@@ -674,7 +746,7 @@ Examples:
     
     # Step 5: Run preprocessing if images provided
     if args.images and args.output:
-        if not run_colmap_pipeline(args.images, args.output, args.matcher):
+        if not run_colmap_pipeline(args.images, args.output, args.matcher, args.skip_extraction, args.skip_matching):
             print("\n" + "="*70)
             print("PIPELINE FAILED")
             print("="*70)
