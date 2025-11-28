@@ -207,9 +207,21 @@ def install_dependencies():
     except Exception:
         pass
 
+    # Remove system torchvision if present (conflicts with pip version)
+    print("Checking for system torchvision package...")
+    system_torchvision = Path("/usr/lib/python3/dist-packages/torchvision")
+    if system_torchvision.exists():
+        print("Removing system torchvision directory (conflicts with pip version)...")
+        subprocess.run(["sudo", "rm", "-rf", "/usr/lib/python3/dist-packages/torchvision*"], check=False)
+    
+    apt_check = subprocess.run(["dpkg", "-l", "python3-torchvision"], capture_output=True)
+    if apt_check.returncode == 0:
+        print("Removing system torchvision package...")
+        subprocess.run(["sudo", "apt", "remove", "-y", "python3-torchvision"], check=False)
+    
     # Install PyTorch (use CUDA 12.1 by default for Lambda GPUs)
     torch_cmd = [
-        sys.executable, "-m", "pip", "install",
+        sys.executable, "-m", "pip", "install", "--upgrade",
         "torch", "torchvision", "torchaudio",
         "--index-url", "https://download.pytorch.org/whl/cu121"
     ]
@@ -237,14 +249,20 @@ def install_dependencies():
     print("-"*70)
     print("Installing gsplat library (CUDA kernels will compile on first use)...")
 
+    # Install numpy 1.x first (pycolmap incompatible with numpy 2.0)
+    print("Installing NumPy 1.x (required for pycolmap)...")
+    numpy_cmd = [sys.executable, "-m", "pip", "install", "numpy<2.0"]
+    subprocess.run(numpy_cmd, check=True)
+    
     gsplat_packages = [
         "gsplat",
         "tqdm",           # Progress bars
         "Pillow",         # Image processing
-        "numpy",          # Numerical operations
         "scipy",          # Scientific computing
         "imageio",        # Image I/O for training script
-        "tyro",           # CLI argument parsing for training script
+        "tyro",           # CLI argument parsing
+        "opencv-python",  # cv2 for dataset loading
+        "torchmetrics",  # Metrics for torch
     ]
 
     pip_cmd = [sys.executable, "-m", "pip", "install"] + gsplat_packages
@@ -278,10 +296,21 @@ def install_dependencies():
     print("\nInstalling example requirements...")
     requirements_file = gsplat_repo / "examples" / "requirements.txt"
     if requirements_file.exists():
-        # Read requirements and install packages that need --no-build-isolation separately
-        print("Installing packages from requirements.txt...")
+        # Ensure numpy 1.x is installed first
+        print("Ensuring NumPy 1.x before pycolmap...")
+        numpy_reinstall_cmd = [sys.executable, "-m", "pip", "install", "--force-reinstall", "numpy<2.0"]
+        subprocess.run(numpy_reinstall_cmd, check=True)
         
-        # First, install packages normally (for proper dependency resolution)
+        # Install specific pycolmap version (required for SceneManager)
+        print("Installing pycolmap from rmbrualla fork...")
+        pycolmap_cmd = [
+            sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps",
+            "git+https://github.com/rmbrualla/pycolmap@cc7ea4b7301720ac29287dbe450952511b32125e"
+        ]
+        subprocess.run(pycolmap_cmd, check=True)
+        
+        # Then install other requirements
+        print("Installing remaining packages from requirements.txt...")
         normal_cmd = [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)]
         result = subprocess.run(normal_cmd, check=False)
         
