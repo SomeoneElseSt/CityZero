@@ -272,18 +272,27 @@ def install_dependencies():
     else:
         print(f"gsplat repository already exists at {gsplat_repo}")
 
-    # Install example requirements (torch first for fused-ssim build dependency)
+    # Install example requirements
     print("\nInstalling example requirements...")
     requirements_file = gsplat_repo / "examples" / "requirements.txt"
     if requirements_file.exists():
-        # Install torch first (required for fused-ssim compilation)
-        print("Installing torch first (required for other packages)...")
-        torch_cmd = [sys.executable, "-m", "pip", "install", "torch", "torchvision"]
-        subprocess.run(torch_cmd, check=True)
+        # Read requirements and install packages that need --no-build-isolation separately
+        print("Installing packages from requirements.txt...")
         
-        # Then install remaining requirements
-        pip_cmd = [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)]
-        subprocess.run(pip_cmd, check=True)
+        # First, install packages normally (for proper dependency resolution)
+        normal_cmd = [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)]
+        result = subprocess.run(normal_cmd, check=False)
+        
+        if result.returncode != 0:
+            print("\nSome packages failed, attempting to install fused-ssim with --no-build-isolation...")
+            # Install fused-ssim specifically with --no-build-isolation
+            fused_cmd = [
+                sys.executable, "-m", "pip", "install", "--no-build-isolation",
+                "git+https://github.com/rahul-goel/fused-ssim@328dc9836f513d00c4b5bc38fe30478b4435cbb5"
+            ]
+            subprocess.run(fused_cmd, check=True)
+            print("fused-ssim installed")
+        
         print("Example requirements installed")
 
     return True
