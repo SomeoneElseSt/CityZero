@@ -243,6 +243,7 @@ def install_dependencies():
         "Pillow",         # Image processing
         "numpy",          # Numerical operations
         "scipy",          # Scientific computing
+        "imageio",        # Image I/O for training script
     ]
 
     pip_cmd = [sys.executable, "-m", "pip", "install"] + gsplat_packages
@@ -298,7 +299,7 @@ def install_dependencies():
     return True
 
 
-def validate_colmap_input(colmap_dir: Path):
+def validate_colmap_input(colmap_dir: Path, images_dir: Path = None):
     """Validate COLMAP output structure."""
     print("\n" + "="*70)
     print("VALIDATING COLMAP INPUT")
@@ -341,10 +342,12 @@ def validate_colmap_input(colmap_dir: Path):
         return False
 
     # Check for images directory
-    images_dir = colmap_dir / "images"
+    if images_dir is None:
+        images_dir = colmap_dir / "images"
+    
     if not images_dir.exists():
-        print(f"\nWARNING: images/ directory not found in {colmap_dir}")
-        print("Training may fail without original images")
+        print(f"\nERROR: Images directory not found: {images_dir}")
+        print("Specify images location with --images flag")
         return False
 
     # Count images
@@ -557,7 +560,12 @@ Notes:
         "--colmap",
         type=Path,
         required=True,
-        help="Path to COLMAP output directory (containing images/ and sparse/)"
+        help="Path to COLMAP output directory (containing sparse/ reconstruction)"
+    )
+    parser.add_argument(
+        "--images",
+        type=Path,
+        help="Path to images directory (if not in COLMAP directory)"
     )
     parser.add_argument(
         "--output",
@@ -612,8 +620,16 @@ Notes:
         print("\nSkipping dependency installation (--skip-install)")
 
     # Step 3: Validate COLMAP input
-    if not validate_colmap_input(args.colmap):
+    if not validate_colmap_input(args.colmap, args.images):
         return 1
+    
+    # Create symlink if images are in separate directory
+    images_dir = args.images if args.images else args.colmap / "images"
+    if args.images and args.images != args.colmap / "images":
+        symlink_path = args.colmap / "images"
+        if not symlink_path.exists():
+            print(f"\nCreating symlink: {symlink_path} -> {images_dir}")
+            symlink_path.symlink_to(images_dir.resolve())
 
     # Step 4: Run training
     if not run_gsplat_training(
