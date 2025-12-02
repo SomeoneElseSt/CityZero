@@ -263,6 +263,7 @@ def install_dependencies():
         "tyro",           # CLI argument parsing
         "opencv-python",  # cv2 for dataset loading
         "torchmetrics",  # Metrics for torch
+        "viser",          # 3D visualization and UI
     ]
 
     pip_cmd = [sys.executable, "-m", "pip", "install"] + gsplat_packages
