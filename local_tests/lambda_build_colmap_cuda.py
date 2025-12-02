@@ -41,6 +41,131 @@ import os
 from pathlib import Path
 from datetime import datetime
 import shutil
+from typing import List, Tuple
+
+PRIMARY_IMAGE_EXTENSION = ".jpg"
+JPEG_EXTENSION = ".jpeg"
+PNG_EXTENSION = ".png"
+MAX_LOGGED_UNSUPPORTED = 5
+MAX_LOGGED_CONVERSIONS = 5
+
+
+def append_path_if_missing(path_collection: List[Path], candidate: Path) -> None:
+    if candidate in path_collection:
+        return
+    path_collection.append(candidate)
+
+
+def collect_image_inventory(images_dir: Path) -> Tuple[List[Path], List[Path], List[Path]]:
+    jpg_files: List[Path] = []
+    jpeg_files: List[Path] = []
+    unsupported_files: List[Path] = []
+
+    for path in sorted(images_dir.iterdir()):
+        if not path.is_file():
+            continue
+        suffix = path.suffix.lower()
+        if suffix == PRIMARY_IMAGE_EXTENSION:
+            jpg_files.append(path)
+            continue
+        if suffix == JPEG_EXTENSION:
+            jpeg_files.append(path)
+            continue
+        unsupported_files.append(path)
+
+    return jpg_files, jpeg_files, unsupported_files
+
+
+def report_unsupported_files(unsupported_files: List[Path]) -> None:
+    if not unsupported_files:
+        return
+
+    print("INFO: Skipping files with unsupported extensions:")
+    listed_files = unsupported_files[:MAX_LOGGED_UNSUPPORTED]
+    for path in listed_files:
+        print(f"  {path.name}")
+
+    remaining = len(unsupported_files) - len(listed_files)
+    if remaining > 0:
+        print(f"  ...and {remaining} more")
+
+    print("COLMAP requires .jpg inputs; please convert unsupported files if needed.")
+
+
+def gather_conversion_targets(jpeg_files: List[Path]) -> Tuple[List[Tuple[Path, Path]], List[Path]]:
+    pending: List[Tuple[Path, Path]] = []
+    reused: List[Path] = []
+
+    for jpeg_path in jpeg_files:
+        target_path = jpeg_path.with_suffix(PRIMARY_IMAGE_EXTENSION)
+        if target_path.exists():
+            append_path_if_missing(reused, target_path)
+            continue
+        pending.append((jpeg_path, target_path))
+
+    return pending, reused
+
+
+def request_and_convert_jpegs(pending: List[Tuple[Path, Path]]) -> Tuple[bool, List[Path]]:
+    if not pending:
+        return True, []
+
+    print(f"{len(pending)} .jpeg image(s) require conversion to {PRIMARY_IMAGE_EXTENSION}.")
+    sample_names = [source.name for source, _ in pending[:MAX_LOGGED_CONVERSIONS]]
+    for name in sample_names:
+        print(f"  pending: {name}")
+    if len(pending) > len(sample_names):
+        print(f"  ...and {len(pending) - len(sample_names)} more")
+
+    response = input(f"Convert these .jpeg images to {PRIMARY_IMAGE_EXTENSION}? [y/N]: ").strip().lower()
+    if response != "y":
+        print("Conversion declined. Please convert .jpeg images to .jpg before running the pipeline.")
+        return False, []
+
+    created_files: List[Path] = []
+    for source, target in pending:
+        destination = target
+        suffix_index = 1
+        while destination.exists():
+            destination = source.parent / f"{source.stem}_{suffix_index}{PRIMARY_IMAGE_EXTENSION}"
+            suffix_index += 1
+        shutil.copy2(source, destination)
+        print(f"Created {destination.name} from {source.name}")
+        append_path_if_missing(created_files, destination)
+
+    return True, created_files
+
+
+def prepare_images_for_colmap(images_dir: Path) -> List[Path]:
+    jpg_files, jpeg_files, unsupported_files = collect_image_inventory(images_dir)
+    report_unsupported_files(unsupported_files)
+
+    if not jpg_files and not jpeg_files:
+        print(f"ERROR: No .jpg or .jpeg images found in {images_dir}")
+        return []
+
+    ready_images: List[Path] = list(jpg_files)
+
+    if not jpeg_files:
+        return sorted(ready_images)
+
+    print(f"Detected {len(jpeg_files)} .jpeg image(s). COLMAP expects .jpg inputs.")
+
+    pending, reused = gather_conversion_targets(jpeg_files)
+
+    if reused:
+        print(f"Reusing {len(reused)} existing .jpg copy/copies for .jpeg sources.")
+        for path in reused:
+            append_path_if_missing(ready_images, path)
+
+    success, converted_files = request_and_convert_jpegs(pending)
+    if not success:
+        return []
+
+    for path in converted_files:
+        append_path_if_missing(ready_images, path)
+
+    return sorted(ready_images)
 
 
 def validate_nvidia_smi():
@@ -340,13 +465,13 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequ
     if not images_dir.exists():
         print(f"ERROR: Images directory does not exist: {images_dir}")
         return False
-    
-    num_images = len(list(images_dir.glob("*.jpg")))
-    if num_images == 0:
-        print(f"ERROR: No .jpg images found in {images_dir}")
+
+    ready_images = prepare_images_for_colmap(images_dir)
+    if not ready_images:
         return False
-    
-    print(f"Found {num_images} images")
+
+    num_images = len(ready_images)
+    print(f"Found {num_images} {PRIMARY_IMAGE_EXTENSION} image(s) ready for processing")
     
     # Prepare output directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -594,8 +719,10 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequ
 def create_summary(output_dir: Path, images_dir: Path, total_duration: float):
     """Create summary JSON file."""
     try:
-        num_images = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
-    except:
+        jpg_files, jpeg_files, unsupported_files = collect_image_inventory(images_dir)
+        png_count = len([path for path in unsupported_files if path.suffix.lower() == PNG_EXTENSION])
+        num_images = len(jpg_files) + len(jpeg_files) + png_count
+    except Exception:
         num_images = "unknown"
     
     summary = {
