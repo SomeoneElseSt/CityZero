@@ -216,12 +216,12 @@ def install_dependencies():
     
     apt_check = subprocess.run(["dpkg", "-l", "python3-torchvision"], capture_output=True)
     if apt_check.returncode == 0:
-        print("Removing system torchvision package...")
-        subprocess.run(["sudo", "apt", "remove", "-y", "python3-torchvision"], check=False)
+        print("Purging system torchvision package...")
+        subprocess.run(["sudo", "apt-get", "purge", "-y", "python3-torchvision"], check=False)
     
     # Install PyTorch (use CUDA 12.1 by default for Lambda GPUs)
     torch_cmd = [
-        sys.executable, "-m", "pip", "install", "--upgrade",
+        sys.executable, "-m", "pip", "install", "--upgrade", "--force-reinstall",
         "torch", "torchvision", "torchaudio",
         "--index-url", "https://download.pytorch.org/whl/cu121"
     ]
@@ -264,6 +264,7 @@ def install_dependencies():
         "opencv-python",  # cv2 for dataset loading
         "torchmetrics",  # Metrics for torch
         "viser",          # 3D visualization and UI
+        "nerfview", 
     ]
 
     pip_cmd = [sys.executable, "-m", "pip", "install"] + gsplat_packages
