@@ -14,9 +14,10 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaFileUpload
 
 # If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 # Gdrive folder ID
 GDRIVE_FOLDER_ID = os.getenv("GDRIVE_FOLDER_ID")
@@ -47,21 +48,20 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
-  try:
     service = build("drive", "v3", credentials=creds)
 
-    # Upload the images to GDRIVE_FOLDER_ID
-    for file in os.listdir(SOURCE_DIR):
-      if file.endswith(".jpg"):
-        file_path = os.path.join(SOURCE_DIR, file)
-        service.files().create(
-          body={"name": file, "parents": [GDRIVE_FOLDER_ID]},
-          media_body=file_path,
-          uploadType="resumable"
-        ).execute()
-
-  except HttpError as error:
-    print(f"An error occurred: {error}")
+    for entry in os.scandir(SOURCE_DIR):
+        if entry.is_file() and entry.name.endswith(".jpg"):
+            file_path = entry.path
+            media = MediaFileUpload(file_path, mimetype="image/jpeg", resumable=True)
+        try:
+            service.files().create(
+                body={"name": entry.name, "parents": [GDRIVE_FOLDER_ID]},
+                media_body=media,
+                fields="id",
+            ).execute()
+        except HttpError as error:
+            print(f"An error occurred: {error}")
 
 if __name__ == "__main__":
   main()
