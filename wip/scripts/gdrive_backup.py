@@ -75,8 +75,14 @@ def main():
 
   service = build("drive", "v3", credentials=creds)
 
+  total_images = sum(1 for e in os.scandir(SOURCE_DIR) if e.is_file() and e.name.endswith(".jpg"))
+  step = 0
   for entry in os.scandir(SOURCE_DIR):
     if entry.is_file() and entry.name.endswith(".jpg"):
+        step += 1
+        if step % 100 == 0:
+            print(f"\nProgress: {len(uploaded_images)}/{total_images} uploaded 🚣‍♂️\n")
+
         if entry.name in uploaded_images:
             print(f"File {entry.name} already uploaded. Skipping. ⚪")
             continue
