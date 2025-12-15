@@ -54,14 +54,16 @@ def main():
         if entry.is_file() and entry.name.endswith(".jpg"):
             file_path = entry.path
             media = MediaFileUpload(file_path, mimetype="image/jpeg", resumable=True)
+            print(f"File {entry.name} has been read and is being uploaded. 🟡")
         try:
             service.files().create(
                 body={"name": entry.name, "parents": [GDRIVE_FOLDER_ID]},
                 media_body=media,
                 fields="id",
             ).execute()
+            print(f"File {entry.name} has been uploaded. 🟢")
         except HttpError as error:
-            print(f"An error occurred: {error}")
+            print(f"An error occurred: {error} for file {entry.name}. 🔴")
 
 if __name__ == "__main__":
   main()
