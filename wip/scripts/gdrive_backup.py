@@ -48,13 +48,14 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
-    service = build("drive", "v3", credentials=creds)
+  service = build("drive", "v3", credentials=creds)
 
-    for entry in os.scandir(SOURCE_DIR):
-        if entry.is_file() and entry.name.endswith(".jpg"):
-            file_path = entry.path
-            media = MediaFileUpload(file_path, mimetype="image/jpeg", resumable=True)
-            print(f"File {entry.name} has been read and is being uploaded. 🟡")
+  for entry in os.scandir(SOURCE_DIR):
+    if entry.is_file() and entry.name.endswith(".jpg"):
+        file_path = entry.path
+        media = MediaFileUpload(file_path, mimetype="image/jpeg", resumable=True)
+        print(f"File {entry.name} has been read and is being uploaded. 🟡")
+        
         try:
             service.files().create(
                 body={"name": entry.name, "parents": [GDRIVE_FOLDER_ID]},
