@@ -265,6 +265,7 @@ def install_dependencies():
         "torchmetrics",  # Metrics for torch
         "viser",          # 3D visualization and UI
         "nerfview", 
+        "splines",
     ]
 
     pip_cmd = [sys.executable, "-m", "pip", "install"] + gsplat_packages
