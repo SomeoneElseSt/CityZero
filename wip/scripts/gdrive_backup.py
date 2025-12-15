@@ -81,7 +81,7 @@ def main():
     if entry.is_file() and entry.name.endswith(".jpg"):
         step += 1
         if step % 100 == 0:
-            print(f"\nProgress: {len(uploaded_images)}/{total_images} uploaded 🚣‍♂️\n")
+            print(f"\nProgress: {len(uploaded_images)}/{total_images} uploaded 🚣‍♂️\n") if entry.name not in uploaded_images else None
 
         if entry.name in uploaded_images:
             print(f"File {entry.name} already uploaded. Skipping. ⚪")
