@@ -8,6 +8,7 @@ The images are already on a Lambda Cloud filesystem but I wanted to back them up
 """
 
 import os.path
+import json
 from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -31,6 +32,23 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 # Source directory
 SOURCE_DIR = "../../data/raw"
+
+# Tracking file
+TRACKING_FILE = "uploaded_images.json"
+
+# Local book-keeping of already uploaded images to skip 
+if os.path.exists(TRACKING_FILE):
+  try:
+    with open(TRACKING_FILE, "r") as f:
+      uploaded_images = json.load(f).get("uploaded_images", {})
+  except Exception:
+    uploaded_images = {}
+  print(f"Tracking file found. {len(uploaded_images)} images have been uploaded and will be skipped.\n")
+else:
+  print(f"Tracking file not found. Creating it...\n")
+  with open(TRACKING_FILE, "w") as f:
+    json.dump({"uploaded_images": {}}, f)
+  uploaded_images = {}
 
 def main():
   """Shows basic usage of the Drive v3 API.
@@ -59,6 +77,10 @@ def main():
 
   for entry in os.scandir(SOURCE_DIR):
     if entry.is_file() and entry.name.endswith(".jpg"):
+        if entry.name in uploaded_images:
+            print(f"File {entry.name} already uploaded. Skipping. ⚪")
+            continue
+
         file_path = entry.path
         media = MediaFileUpload(file_path, mimetype="image/jpeg", resumable=True)
         print(f"File {entry.name} is being uploaded. 🟡")
@@ -70,6 +92,9 @@ def main():
                 fields="id",
             ).execute()
             print(f"File {entry.name} has been uploaded. 🟢")
+            uploaded_images[entry.name] = True
+            with open(TRACKING_FILE, "w") as f:
+                json.dump({"uploaded_images": uploaded_images}, f)
         except HttpError as error:
             print(f"An error occurred: {error} for file {entry.name}. 🔴")
 

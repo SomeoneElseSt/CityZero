@@ -45,6 +45,9 @@ local_tests/outputs/
 *.tar.gz
 *.pem
 
+# Cache
+wip/scripts/uploaded_images.json
+
 # Google Drive secrets
 wip/scripts/token.json
 wip/scripts/credentials.json
