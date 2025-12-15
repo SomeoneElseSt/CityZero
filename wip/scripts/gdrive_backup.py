@@ -8,7 +8,7 @@ The images are already on a Lambda Cloud filesystem but I wanted to back them up
 """
 
 import os.path
-
+from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -16,11 +16,18 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
-# If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+# Load environment variables
+load_dotenv()
 
 # Gdrive folder ID
-GDRIVE_FOLDER_ID = os.getenv("GDRIVE_FOLDER_ID")
+GDRIVE_FOLDER_ID = os.getenv('GDRIVE_FOLDER_ID')
+
+if not GDRIVE_FOLDER_ID:
+  print("Error: GDRIVE_FOLDER_ID is not set")
+  exit(1)
+
+# If modifying these scopes, delete the file token.json.
+SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 # Source directory
 SOURCE_DIR = "../../data/raw"
