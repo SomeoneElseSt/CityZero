@@ -23,7 +23,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 GDRIVE_FOLDER_ID = os.getenv("GDRIVE_FOLDER_ID")
 
 # Source directory
-SOURCE_DIR = ".data/raw"
+SOURCE_DIR = "../../data/raw"
 
 def main():
   """Shows basic usage of the Drive v3 API.
@@ -54,7 +54,7 @@ def main():
     if entry.is_file() and entry.name.endswith(".jpg"):
         file_path = entry.path
         media = MediaFileUpload(file_path, mimetype="image/jpeg", resumable=True)
-        print(f"File {entry.name} has been read and is being uploaded. 🟡")
+        print(f"File {entry.name} is being uploaded. 🟡")
         
         try:
             service.files().create(
