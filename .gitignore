@@ -45,6 +45,10 @@ local_tests/outputs/
 *.tar.gz
 *.pem
 
+# Google Drive secrets
+wip/scripts/token.json
+wip/scripts/credentials.json
+
 # IDE
 .vscode/
 .idea/
