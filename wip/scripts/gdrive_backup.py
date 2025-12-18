@@ -9,6 +9,7 @@ The images are already on a Lambda Cloud filesystem but I wanted to back them up
 
 import os.path
 import json
+import time
 from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -29,6 +30,9 @@ if not GDRIVE_FOLDER_ID:
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+
+# Retry config
+MAX_UPLOAD_RETRIES = 5
 
 # Source directory
 SOURCE_DIR = "../../data/raw"
@@ -91,18 +95,36 @@ def main():
         media = MediaFileUpload(file_path, mimetype="image/jpeg", resumable=True)
         print(f"File {entry.name} is being uploaded. 🟡")
         
-        try:
-            service.files().create(
-                body={"name": entry.name, "parents": [GDRIVE_FOLDER_ID]},
-                media_body=media,
-                fields="id",
-            ).execute()
-            print(f"File {entry.name} has been uploaded. 🟢")
-            uploaded_images[entry.name] = True
-            with open(TRACKING_FILE, "w") as f:
-                json.dump({"uploaded_images": uploaded_images}, f)
-        except HttpError as error:
-            print(f"An error occurred: {error} for file {entry.name}. 🔴")
+        uploaded_ok = False
+        for attempt in range(MAX_UPLOAD_RETRIES):
+            try:
+                service.files().create(
+                    body={"name": entry.name, "parents": [GDRIVE_FOLDER_ID]},
+                    media_body=media,
+                    fields="id",
+                ).execute(num_retries=3)
+                uploaded_ok = True
+                break
+            except TimeoutError as error:
+                wait_seconds = min(60, 2 ** attempt)
+                print(f"Timeout uploading {entry.name}: {error}. Retrying in {wait_seconds}s...")
+                time.sleep(wait_seconds)
+                continue
+            except HttpError as error:
+                print(f"An error occurred: {error} for file {entry.name}. 🔴")
+                break
+            except Exception as error:
+                print(f"Unexpected error uploading {entry.name}: {error}. Continuing...\n")
+                break
+
+        if not uploaded_ok:
+            print(f"Giving up on {entry.name}, continuing...\n")
+            continue
+
+        print(f"File {entry.name} has been uploaded. 🟢")
+        uploaded_images[entry.name] = True
+        with open(TRACKING_FILE, "w") as f:
+            json.dump({"uploaded_images": uploaded_images}, f)
 
 if __name__ == "__main__":
   main()
