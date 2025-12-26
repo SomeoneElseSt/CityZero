@@ -3,7 +3,7 @@
 CLAUDE.md
 
 # Cookies 
-local_tests/scripts/cookies.txt
+wip/scripts/cookies.txt
 
 # Python
 __pycache__/
@@ -38,9 +38,9 @@ outputs/renders/*
 !outputs/renders/.gitkeep
 data/download_metadata.json
 
-# Local test data and outputs
-local_tests/*/images/
-local_tests/outputs/
+# WIP data and outputs
+wip/*/images/
+wip/outputs/
 
 # Compressed archives and SSH keys
 *.tar.gz
