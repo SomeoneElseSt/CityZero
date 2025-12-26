@@ -480,6 +480,14 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequ
     database_path = output_dir / "database.db"
     sparse_dir = output_dir / "sparse"
     sparse_dir.mkdir(exist_ok=True)
+
+    # Create image list file to avoid processing duplicate converted images
+    # (e.g. processing both image.jpeg and image.jpg) due to .heif conversion
+    image_list_path = output_dir / "image_list.txt"
+    with open(image_list_path, "w") as f:
+        for img_path in ready_images:
+            f.write(f"{img_path.name}\n")
+    print(f"Created image list file at {image_list_path}")
     
     # Handle database cleanup for re-running steps
     if skip_extraction and not skip_matching:
@@ -534,6 +542,7 @@ def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequ
         feat_cmd = [
             "/usr/local/bin/colmap", "feature_extractor",
             "--image_path", str(images_dir),
+            "--image_list_path", str(image_list_path),
             "--database_path", str(database_path),
             "--ImageReader.camera_model", "OPENCV",
             "--ImageReader.single_camera", "0",
