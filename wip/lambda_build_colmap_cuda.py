@@ -291,6 +291,8 @@ def install_dependencies():
         "libmetis-dev", "libgoogle-glog-dev", "libgflags-dev",
         "libsqlite3-dev", "libglew-dev", "qtbase5-dev",
         "libqt5opengl5-dev", "libcgal-dev",
+        "libopenimageio-dev", "libopenexr-dev", "openimageio-tools",
+        "libopencv-dev",
         # CUDA dependencies
         "libceres-dev",
         # Additional useful tools
