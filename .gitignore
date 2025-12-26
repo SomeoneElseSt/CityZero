@@ -36,6 +36,7 @@ outputs/models/*
 outputs/renders/*
 !outputs/models/.gitkeep
 !outputs/renders/.gitkeep
+data/download_metadata.json
 
 # Local test data and outputs
 local_tests/*/images/

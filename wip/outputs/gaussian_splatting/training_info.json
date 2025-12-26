@@ -1,8 +1,0 @@
-{
-  "colmap_dir": "/Users/steve/Documents/Files/code/cityzero/local_tests/outputs/int_forum/sparse/0",
-  "brush_output_dir": "/Users/steve/Documents/Files/code/cityzero/local_tests/outputs/gaussian_splatting/brush",
-  "training_steps": 15000,
-  "max_splats": 5000000,
-  "sh_degree": 3,
-  "brush_executable": "/Users/steve/.brush/target/release/brush_app"
-}
