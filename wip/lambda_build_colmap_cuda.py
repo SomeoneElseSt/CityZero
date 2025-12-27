@@ -49,6 +49,14 @@ PNG_EXTENSION = ".png"
 MAX_LOGGED_UNSUPPORTED = 5
 MAX_LOGGED_CONVERSIONS = 5
 
+MKL_BLA_VENDOR = "Intel10_64lp"
+UBUNTU_22_04 = "22.04"
+CUDA_LOCAL_NVCC = "/usr/local/cuda/bin/nvcc"
+CUDA_APT_NVCC = "/usr/bin/nvcc"
+GCC_10 = "/usr/bin/gcc-10"
+GXX_10 = "/usr/bin/g++-10"
+DEFAULT_CMAKE_CUDA_ARCHITECTURES = "80;86"  # A100=80, A10=86
+
 
 def append_path_if_missing(path_collection: List[Path], candidate: Path) -> None:
     if candidate in path_collection:
@@ -275,35 +283,123 @@ def check_system():
     return True
 
 
-def install_dependencies():
+def read_ubuntu_version() -> str:
+    """Return Ubuntu version like '24.04' if detectable, else empty string."""
+    try:
+        with open("/etc/os-release") as f:
+            content = f.read()
+    except Exception:
+        return ""
+
+    for version in ("24.04", "22.04", "20.04"):
+        if version in content:
+            return version
+    return ""
+
+
+def resolve_nvcc_path() -> str | None:
+    local_nvcc = Path(CUDA_LOCAL_NVCC)
+    if local_nvcc.exists():
+        return str(local_nvcc)
+
+    apt_nvcc = Path(CUDA_APT_NVCC)
+    if apt_nvcc.exists():
+        return str(apt_nvcc)
+
+    found = shutil.which("nvcc")
+    if found:
+        return found
+
+    return None
+
+
+def build_colmap_cmake_env(ubuntu_version: str, using_ubuntu_cuda_toolkit: bool) -> dict:
+    """
+    Build environment variables for COLMAP CMake.
+
+    COLMAP docs note: on Ubuntu 22.04, compiling with Ubuntu's default CUDA package may require GCC 10.
+    We only apply this workaround if we appear to be using Ubuntu's CUDA toolkit (apt).
+    """
+    env = dict(os.environ)
+    if not using_ubuntu_cuda_toolkit:
+        return env
+
+    if ubuntu_version != UBUNTU_22_04:
+        return env
+
+    if not Path(GCC_10).exists() or not Path(GXX_10).exists():
+        print("WARNING: Ubuntu CUDA toolkit detected, but GCC-10/G++-10 not found.")
+        print("  If CMake fails due to compiler/CUDA incompatibility, install gcc-10 g++-10 and retry.")
+        return env
+
+    env["CC"] = GCC_10
+    env["CXX"] = GXX_10
+    env["CUDAHOSTCXX"] = GXX_10
+    print("Using GCC-10/G++-10 for CUDA host compilation (Ubuntu 22.04 + Ubuntu CUDA toolkit workaround).")
+    return env
+
+
+def install_dependencies() -> bool:
     """Install all required dependencies."""
-    print("\n" + "="*70)
-    print("INSTALLING DEPENDENCIES")
-    print("="*70)
-    
     packages = [
         # Build tools
-        "git", "cmake", "ninja-build", "build-essential",
-        # COLMAP dependencies
-        "libboost-program-options-dev", "libboost-filesystem-dev",
-        "libboost-graph-dev", "libboost-system-dev",
-        "libeigen3-dev", "libflann-dev", "libfreeimage-dev",
-        "libmetis-dev", "libgoogle-glog-dev", "libgflags-dev",
-        "libsqlite3-dev", "libglew-dev", "qtbase5-dev",
-        "libqt5opengl5-dev", "libcgal-dev",
-        "libopenimageio-dev", "libopenexr-dev", "openimageio-tools",
-        "libopencv-dev",
-        # CUDA dependencies
+        "git",
+        "cmake",
+        "ninja-build",
+        "build-essential",
+        # Core COLMAP deps
+        "libboost-program-options-dev",
+        "libboost-filesystem-dev",
+        "libboost-graph-dev",
+        "libboost-system-dev",
+        "libeigen3-dev",
+        "libfreeimage-dev",
+        "libmetis-dev",
+        "libgoogle-glog-dev",
+        "libgflags-dev",
+        "libgtest-dev",
+        "libgmock-dev",
+        "libsqlite3-dev",
+        "libglew-dev",
+        "libcgal-dev",
         "libceres-dev",
+        "libcurl4-openssl-dev",
+        "libssl-dev",
+        "libmkl-full-dev",
+        # Extra but commonly useful (kept from previous script)
+        "libflann-dev",
+        "libopenimageio-dev",
+        "libopenexr-dev",
+        "openimageio-tools",
+        "libopencv-dev",
         # Additional useful tools
         "python3-pip",
     ]
+
+    ubuntu_version = read_ubuntu_version()
+
+    # CUDA toolkit (apt) is recommended by COLMAP docs, but Lambda images usually already provide
+    # a newer CUDA toolchain in /usr/local/cuda. Only install apt CUDA toolkit if nvcc is missing.
+    has_nvcc = resolve_nvcc_path() is not None
+    if not has_nvcc:
+        packages += [
+            "nvidia-cuda-toolkit",
+            "nvidia-cuda-toolkit-gcc",
+        ]
+        if ubuntu_version == UBUNTU_22_04:
+            packages += [
+                "gcc-10",
+                "g++-10",
+            ]
     
     print(f"Installing {len(packages)} packages...")
     print("This will take 5-10 minutes...\n")
     
     # Update package list
-    subprocess.run(["sudo", "apt", "update"], check=True)
+    update_result = subprocess.run(["sudo", "apt", "update"])
+    if update_result.returncode != 0:
+        print("ERROR: Failed to update apt package list")
+        return False
     
     # Install packages
     cmd = ["sudo", "apt", "install", "-y"] + packages
@@ -317,12 +413,9 @@ def install_dependencies():
     return True
 
 
-def build_colmap_cuda():
+def build_colmap_cuda(cmake_cuda_architectures: str) -> bool:
     """Build COLMAP from source with CUDA support."""
-    print("\n" + "="*70)
     print("BUILDING COLMAP WITH CUDA")
-    print("="*70)
-    print("This will take 30-45 minutes on an A100...\n")
     
     colmap_dir = Path.home() / "colmap_cuda"
     
@@ -345,17 +438,33 @@ def build_colmap_cuda():
     # Configure with CMake
     print("\nConfiguring COLMAP with CMake...")
     print("Enabling: CUDA, Tests, CGAL")
-    
+
+    ubuntu_version = read_ubuntu_version()
+    nvcc_path = resolve_nvcc_path()
+    if not nvcc_path:
+        print("ERROR: nvcc not found after installing dependencies")
+        print("  If you're using Lambda, CUDA is usually available at /usr/local/cuda.")
+        print("  Otherwise, install CUDA or enable the Ubuntu CUDA toolkit install.")
+        return False
+
+    using_ubuntu_cuda_toolkit = (nvcc_path == CUDA_APT_NVCC) and (not Path(CUDA_LOCAL_NVCC).exists())
+    cmake_env = build_colmap_cmake_env(
+        ubuntu_version=ubuntu_version,
+        using_ubuntu_cuda_toolkit=using_ubuntu_cuda_toolkit,
+    )
+
     cmake_cmd = [
         "cmake", "..",
         "-GNinja",
         "-DCMAKE_BUILD_TYPE=Release",
-        "-DCMAKE_CUDA_ARCHITECTURES=80",  # A100 architecture
+        "-DBLA_VENDOR=" + MKL_BLA_VENDOR,
+        "-DCMAKE_CUDA_ARCHITECTURES=" + cmake_cuda_architectures,
         "-DCUDA_ENABLED=ON",
-        "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
+        "-DCMAKE_CUDA_COMPILER=" + nvcc_path,
+        "-DGUI_ENABLED=OFF",
     ]
-    
-    result = subprocess.run(cmake_cmd, cwd=build_dir)
+
+    result = subprocess.run(cmake_cmd, cwd=build_dir, env=cmake_env)
     if result.returncode != 0:
         print("ERROR: CMake configuration failed")
         return False
@@ -364,7 +473,6 @@ def build_colmap_cuda():
     
     # Build
     print("\nBuilding COLMAP...")
-    print("This is the long part (30-40 minutes)...\n")
     
     start_time = datetime.now()
     
@@ -432,29 +540,28 @@ def verify_cuda_colmap():
         print("ERROR: COLMAP executable not found")
         return False
     
-    try:
-        result = subprocess.run(
-            [colmap_path, "-h"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        
-        if "with CUDA" in result.stdout:
-            print("COLMAP compiled WITH CUDA support")
-            print(f"\nVersion info:")
-            # Extract version line
-            for line in result.stdout.split('\n'):
-                if 'COLMAP' in line and 'CUDA' in line:
-                    print(f"  {line.strip()}")
-            return True
-        else:
-            print("ERROR: COLMAP was NOT compiled with CUDA")
-            return False
-            
-    except Exception as e:
-        print(f"ERROR: Could not verify COLMAP: {e}")
+    result = subprocess.run(
+        [colmap_path, "-h"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Could not verify COLMAP (exit code {result.returncode})")
+        if result.stderr:
+            print(result.stderr.strip())
         return False
+
+    if "with CUDA" not in result.stdout:
+        print("ERROR: COLMAP was NOT compiled with CUDA")
+        return False
+
+    print("COLMAP compiled WITH CUDA support")
+    print("\nVersion info:")
+    # Extract version line
+    for line in result.stdout.split('\n'):
+        if 'COLMAP' in line and 'CUDA' in line:
+            print(f"  {line.strip()}")
+    return True
 
 
 def run_colmap_pipeline(images_dir: Path, output_dir: Path, matcher: str = "sequential", skip_extraction: bool = False, skip_matching: bool = False):
@@ -840,6 +947,15 @@ Examples:
         action="store_true",
         help="Skip feature matching (reuse existing matches in database)"
     )
+    parser.add_argument(
+        "--cmake-cuda-architectures",
+        type=str,
+        default=DEFAULT_CMAKE_CUDA_ARCHITECTURES,
+        help=(
+            "Value for CMake's CMAKE_CUDA_ARCHITECTURES. "
+            f"Default: {DEFAULT_CMAKE_CUDA_ARCHITECTURES} (A100=80, A10=86)."
+        ),
+    )
     
     args = parser.parse_args()
     
@@ -861,7 +977,7 @@ Examples:
         if not install_dependencies():
             return 1
         
-        if not build_colmap_cuda():
+        if not build_colmap_cuda(cmake_cuda_architectures=args.cmake_cuda_architectures):
             return 1
         
         if not verify_cuda_colmap():
