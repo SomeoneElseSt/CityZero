@@ -31,6 +31,12 @@ NOTES:
 - COLMAP may print warnings like "Could not register" but still succeed; the script verifies success.
 - Use tmux to prevent disconnection: `tmux new -s colmap`.
 - Always terminate the Lambda instance after download to stop billing.
+
+Note:
+
+I read the COLMAP docs and think this needs a re-work:
+1. Building from source is easy - in fact, COLMAP oughta detect CUDA on its own this way. Not sure if it's a Lambda issue but all the extra is unnecessary. 
+2. The best matcher is a vocabulary tree. Not sure if there is a optimal hyperparam on k-neighboors, should check it out. Download: https://demuc.de/colmap/ | worth trying to use transitive or exhaustive matching in order if the prev. approach doesn't work. 
 """
 
 import argparse
