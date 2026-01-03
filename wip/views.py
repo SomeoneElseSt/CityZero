@@ -43,9 +43,11 @@ def install_dependencies() -> None:
         "libcurl4-openssl-dev",
         "libssl-dev",
         "libmkl-full-dev",
+        "libtbb-dev",
         "libopenimageio-dev",
         "libopenexr-dev",
         "openimageio-tools",
+        "libopencv-dev",
         "qt6-base-dev",
         "libqt6opengl6-dev",
         "libqt6openglwidgets6",
@@ -59,6 +61,10 @@ def install_dependencies() -> None:
     if update_result.returncode != 0:
         print(f"ERROR: Failed to update apt package list (exit code: {update_result.returncode})")
         sys.exit(1)
+
+    print("Resolving package conflicts...")
+    subprocess.run(["sudo", "apt", "remove", "-y", "ucx", "libucx0"], env=env)
+    subprocess.run(["sudo", "apt", "upgrade", "-y"], env=env)
 
     print("Installing dependencies...")
     cmd = ["sudo", "apt", "install", "-y"] + packages
