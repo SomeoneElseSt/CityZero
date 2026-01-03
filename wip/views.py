@@ -56,7 +56,10 @@ def install_dependencies() -> None:
     ]
 
     print("Updating apt package list...")
-    env = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
+    env = dict(os.environ, 
+               DEBIAN_FRONTEND="noninteractive",
+               NEEDRESTART_MODE="a",
+               NEEDRESTART_SUSPEND="1")
     update_result = subprocess.run(["sudo", "apt", "update"], env=env)
     if update_result.returncode != 0:
         print(f"ERROR: Failed to update apt package list (exit code: {update_result.returncode})")
@@ -147,7 +150,7 @@ def build_colmap_from_source() -> None:
     build_cmd = ["ninja", "-j", str(num_cores)]
     start_time = datetime.now()
 
-    result = subprocess.run(build_cmd, cwd=build_dir, capture_output=True, text=True)
+    result = subprocess.run(build_cmd, cwd=build_dir)
     duration = (datetime.now() - start_time).total_seconds()
 
     if result.returncode != 0:
