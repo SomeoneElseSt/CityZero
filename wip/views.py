@@ -43,6 +43,9 @@ def install_dependencies() -> None:
         "libcurl4-openssl-dev",
         "libssl-dev",
         "libmkl-full-dev",
+        "libopenimageio-dev",
+        "libopenexr-dev",
+        "openimageio-tools",
         "qt6-base-dev",
         "libqt6opengl6-dev",
         "libqt6openglwidgets6",
@@ -50,23 +53,18 @@ def install_dependencies() -> None:
         "nvidia-cuda-toolkit-gcc",
     ]
 
-    update_result = subprocess.run(
-        ["sudo", "apt", "update"],
-        capture_output=True,
-        text=True
-    )
+    print("Updating apt package list...")
+    env = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
+    update_result = subprocess.run(["sudo", "apt", "update"], env=env)
     if update_result.returncode != 0:
         print(f"ERROR: Failed to update apt package list (exit code: {update_result.returncode})")
-        if update_result.stderr:
-            print(update_result.stderr)
         sys.exit(1)
 
+    print("Installing dependencies...")
     cmd = ["sudo", "apt", "install", "-y"] + packages
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, env=env)
     if result.returncode != 0:
         print(f"ERROR: Failed to install dependencies (exit code: {result.returncode})")
-        if result.stderr:
-            print(result.stderr)
         sys.exit(1)
 
     print("All dependencies installed")
@@ -179,6 +177,8 @@ if __name__ == "__main__":
     if args.skip_build:
         print("Skipping build (--skip-build)")
         sys.exit(0)
+
+    print("Starting build")
 
     install_dependencies()
     build_colmap_from_source()
