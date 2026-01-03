@@ -176,20 +176,20 @@ def build_colmap_from_source() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build COLMAP from source with CUDA support")
     parser.add_argument(
-        "--skip-build",
+        "--skip-dependencies",
         action="store_true",
-        help="Skip building COLMAP (use if already built)"
+        help="Skip dependency installation (use if already installed)"
     )
 
     args = parser.parse_args()
 
-    if args.skip_build:
-        print("Skipping build (--skip-build)")
-        sys.exit(0)
+    print("Starting COLMAP build")
 
-    print("Starting build")
+    if not args.skip_dependencies:
+        install_dependencies()
+    else:
+        print("Skipping dependency installation (--skip-dependencies)")
 
-    install_dependencies()
     build_colmap_from_source()
 
     print("\nBuild complete!")
