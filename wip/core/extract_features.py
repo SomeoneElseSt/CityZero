@@ -19,6 +19,10 @@ def extract_features(image_path, database_path) -> None:
         print("Database Path is None. Please provide a valid database path")
         sys.exit(1)
 
+    if "database.db" not in str(database_path):
+        print("You must provide a path + database file -- you did not provide a file at the end of the path -> database.db")
+        sys.exit(1)
+
     print("Starting feature extraction.")
 
     cmd = [
@@ -31,7 +35,7 @@ def extract_features(image_path, database_path) -> None:
         "--ImageReader.single_camera_per_image", "1",  # Use a different camera for each image
         "--FeatureExtraction.use_gpu", "1",  # Use GPU for extraction
         "--FeatureExtraction.num_threads", "-1",  # Use all Cores
-        "--FeatureExtraction.max_image_size", "2048",  # Limit max image res
+        "--SiftExtraction.max_image_size", "2048",  # Limit max image res
         "--SiftExtraction.max_num_features", "4096",  # Limit feature file size
     ]
 
@@ -41,7 +45,7 @@ def extract_features(image_path, database_path) -> None:
         print(f"\nFeature Extraction failed with exit code: {e.returncode}")
         sys.exit(1)
 
-    print("Feature Extraction is done!")
+    print("\n Feature Extraction is done!")
 
 
 if __name__ == "__main__":
