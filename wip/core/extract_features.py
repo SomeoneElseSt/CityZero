@@ -12,7 +12,7 @@ from pathlib import Path
 def extract_features(image_path, database_path) -> None:
 
     if image_path is None or not image_path:
-        print("Image Path is None. Please provide a valid image path") 
+        print("Image Path is None. Please provide a valid image path")
         sys.exit(1)
 
     if database_path is None or not database_path:
@@ -28,9 +28,10 @@ def extract_features(image_path, database_path) -> None:
         "--database_path", str(database_path),
         "--camera_mode", "3",  # Different model for each Image
         "--ImageReader.single_camera", "0",  # No shared intrinsics
-        "--ImageReader.single_camera_per_image", "1",  # Use a different camera for each image 
+        "--ImageReader.single_camera_per_image", "1",  # Use a different camera for each image
         "--FeatureExtraction.use_gpu", "1",  # Use GPU for extraction
         "--FeatureExtraction.num_threads", "-1",  # Use all Cores
+        "--FeatureExtraction.max_image_size", "2048",  # Limit max image res
         "--SiftExtraction.max_num_features", "4096",  # Limit feature file size
     ]
 
