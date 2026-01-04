@@ -30,13 +30,14 @@ def extract_features(image_path, database_path) -> None:
         "--ImageReader.single_camera", "0",  # No shared intrinsics
         "--ImageReader.single_camera_per_image", "1",  # Use a different camera for each image 
         "--FeatureExtraction.use_gpu", "1",  # Use GPU for extraction
-        "--FeatureExtraction.num_threads", "-1"  # Use all Cores
+        "--FeatureExtraction.num_threads", "-1",  # Use all Cores
+        "--SiftExtraction.max_num_features", "4096",  # Limit feature file size
     ]
 
     try:
         result = subprocess.run(cmd, check=True, text=True)
     except subprocess.CalledProcessError as e:
-        print(f"\n Feature Extraction failed with exit code: {e.returncode}")
+        print(f"\nFeature Extraction failed with exit code: {e.returncode}")
         sys.exit(1)
 
     print("Feature Extraction is done!")
