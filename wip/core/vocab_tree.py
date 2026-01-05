@@ -3,6 +3,8 @@ I figured that since the default vocabulary by COLMAP isn't fully centered on ur
 it makes more sense to train a custom vocab tree for feature matching down the line. This script does that. 
 """
 
+import argparse
+import subprocess
 import sys
 
 def build_vocab_tree(database_path, vocab_tree_path) -> None: 
@@ -27,10 +29,36 @@ def build_vocab_tree(database_path, vocab_tree_path) -> None:
         "--database_path", str(database_path),
         "--vocab_tree_path", str(vocab_tree_path),
         "--VocabTreeBuilding.num_visual_words", "1000000",
-        "--VocabTreeBuilding.branching_factor", "10",
-        "--VocabTreeBuilding.max_num_images", "15000",
+        "--VocabTreeBuilding.branching_factor", "10", 
+        "--VocabTreeBuilding.max_num_images", "100000", # The images to be sampled for the tree
         "--VocabTreeBuilding.num_kmeans_iterations", "10",
-        "--VocabTreeBuilding.num_threads", "-1"
+        "--VocabTreeBuilding.num_threads", "30" # Lambda's AMD EPYC 7J13 
     ]
-    
-    
+
+    try:
+        result = subprocess.run(cmd, check=True, text=True)
+    except subprocess.CalledProcessError as e:
+        print(f"\nVocab tree building failed with exit code: {e.returncode}")
+        sys.exit(1)
+
+    print("\nVocab tree building is done!")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Build custom vocabulary tree using COLMAP")
+    parser.add_argument(
+        "--database_path",
+        type=str,
+        required=True,
+        help="Path to COLMAP database file"
+    )
+    parser.add_argument(
+        "--vocab_tree_path",
+        type=str,
+        required=True,
+        help="Path to output vocabulary tree binary file"
+    )
+
+    args = parser.parse_args()
+
+    build_vocab_tree(args.database_path, args.vocab_tree_path)
