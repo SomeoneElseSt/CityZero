@@ -28,11 +28,10 @@ def build_vocab_tree(database_path, vocab_tree_path) -> None:
         "vocab_tree_builder",
         "--database_path", str(database_path),
         "--vocab_tree_path", str(vocab_tree_path),
-        "--VocabTreeBuilding.num_visual_words", "1000000",
-        "--VocabTreeBuilding.branching_factor", "10", 
-        "--VocabTreeBuilding.max_num_images", "100000", # The images to be sampled for the tree
-        "--VocabTreeBuilding.num_kmeans_iterations", "10",
-        "--VocabTreeBuilding.num_threads", "30" # Lambda's AMD EPYC 7J13 
+        "--num_visual_words", "1000000",
+        "--max_num_images", "100000", # The images to be sampled for the tree
+        "--num_threads", "30", # Lambda's AMD EPYC 7J13 
+        "--num_iterations", "20", # Down from default for computational sake
     ]
 
     try:
