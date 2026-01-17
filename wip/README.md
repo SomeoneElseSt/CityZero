@@ -75,7 +75,7 @@ Sequential is default. Exhaustive scales poorly with large image counts.
 **Quick upload command** (uploads all necessary scripts):
 ```bash
 # From local_tests directory, upload all scripts in one command:
-scp -i *.pem lambda_build_colmap_cuda.py lambda_train_gsplat.py scripts/youtube_splits_lambda.py scripts/cookies.txt ubuntu@YOUR_IP:~/
+scp -i *.pem your_files ubuntu@YOUR_IP:~/
 ```
 
 **Alternative: Upload individually**
