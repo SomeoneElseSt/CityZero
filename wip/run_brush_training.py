@@ -25,8 +25,10 @@ import sys
 # ============================================================================
 
 SCRIPT_DIR = Path(__file__).parent
-IMAGES_DIR = SCRIPT_DIR / "financial_district_images" / "images"
-COLMAP_SPARSE_DIR = SCRIPT_DIR / "outputs" / "colmap_output" / "colmap_output" / "sparse" / "0"
+IMAGES_DIR = SCRIPT_DIR / "train"
+COLMAP_ROOT = SCRIPT_DIR / "colmap_gui_test"
+COLMAP_SPARSE_DIR = COLMAP_ROOT / "sparse" / "0"
+COLMAP_IMAGES_DIR = COLMAP_ROOT / "images"
 BRUSH_OUTPUT_DIR = SCRIPT_DIR / "outputs" / "gaussian_splatting" / "brush"
 TRAINING_INFO_PATH = SCRIPT_DIR / "outputs" / "gaussian_splatting" / "training_info.json"
 
@@ -93,25 +95,66 @@ def check_brush_installed():
 # COLMAP Validation
 # ============================================================================
 
+def get_image_files():
+    """Get all image files, normalizing extensions in memory (not on disk)."""
+    if not IMAGES_DIR.exists():
+        return []
+    
+    # Find all image files with various extensions
+    image_extensions = ["*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG"]
+    all_images = []
+    for ext in image_extensions:
+        all_images.extend(IMAGES_DIR.glob(ext))
+    
+    return all_images
+
+
+def setup_images_symlink():
+    """Create symlink from colmap_gui_test/images to train/ if needed."""
+    if COLMAP_IMAGES_DIR.exists():
+        if COLMAP_IMAGES_DIR.is_symlink():
+            print(f"  Images symlink already exists: {COLMAP_IMAGES_DIR}")
+        else:
+            print(f"  Images directory already exists: {COLMAP_IMAGES_DIR}")
+        return True
+    
+    if not IMAGES_DIR.exists():
+        print(f"✗ Source images directory not found: {IMAGES_DIR}")
+        return False
+    
+    # Create symlink
+    try:
+        COLMAP_IMAGES_DIR.symlink_to(IMAGES_DIR.resolve())
+        print(f"  Created images symlink: {COLMAP_IMAGES_DIR} -> {IMAGES_DIR}")
+        return True
+    except Exception as e:
+        print(f"✗ Failed to create images symlink: {e}")
+        return False
+
+
 def validate_colmap_output():
     """Check that COLMAP processing completed successfully."""
     print("Validating COLMAP output...")
     
-    # Check for images directory
+    # Check for source images directory
     if not IMAGES_DIR.exists():
         print(f"✗ Images directory not found: {IMAGES_DIR}")
         print()
-        print("Please ensure images are in: financial_district_images/images/")
+        print("Please ensure images are in: train/")
         return False
     
-    # Count images
-    image_files = list(IMAGES_DIR.glob("*.jpg")) + list(IMAGES_DIR.glob("*.png"))
+    # Get all image files (normalized in memory)
+    image_files = get_image_files()
     if len(image_files) == 0:
         print(f"✗ No images found in {IMAGES_DIR}")
         print()
         return False
     
     print(f"  Found {len(image_files)} images")
+    
+    # Setup images symlink in COLMAP directory
+    if not setup_images_symlink():
+        return False
     
     # Check for sparse reconstruction
     if not COLMAP_SPARSE_DIR.exists():
@@ -136,7 +179,7 @@ def validate_colmap_output():
                 return False
     
     if missing_files:
-        print(f"✗ Missing COLMAP files in {sparse_dir}:")
+        print(f"✗ Missing COLMAP files in {COLMAP_SPARSE_DIR}:")
         for filename in missing_files:
             print(f"  - {filename}")
         print()
@@ -158,7 +201,7 @@ def run_brush_training():
     print("BRUSH TRAINING")
     print("="*70)
     print()
-    print(f"Input:  {COLMAP_SPARSE_DIR}")
+    print(f"Input:  {COLMAP_ROOT}")
     print(f"Output: {BRUSH_OUTPUT_DIR}")
     print()
     print(f"Training steps: {TRAINING_STEPS}")
@@ -171,14 +214,13 @@ def run_brush_training():
     
     # Build Brush command
     # Format: brush [OPTIONS] <DATA_PATH>
-    # DATA_PATH should point to directory containing sparse/ folder
-    colmap_root = COLMAP_SPARSE_DIR.parent.parent  # Go up from sparse/0 to colmap_output root
+    # DATA_PATH should point to directory containing sparse/ and images/ folders
     cmd = [
         str(BRUSH_EXECUTABLE),
         "--total-steps", str(TRAINING_STEPS),
         "--max-splats", str(MAX_SPLATS),
         "--sh-degree", str(SH_DEGREE),
-        str(colmap_root),
+        str(COLMAP_ROOT),
     ]
     
     print("Running command:")
