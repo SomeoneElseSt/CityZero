@@ -28,32 +28,35 @@ def load_json_file(file_path):
 
 
 def get_box_corners(box_data):
-    """Extract corner coordinates from box data as list of [lat, lon] tuples."""
+    """Extract corner coordinates from box data as list of [lon, lat] tuples (x, y format)."""
     corners = []
     order = ["nw", "ne", "se", "sw"]
     for corner_key in order:
         corner = box_data.get(corner_key, {})
         lat = float(corner.get("lat", 0))
         lon = float(corner.get("lon", 0))
-        corners.append([lat, lon])
+        corners.append([lon, lat])  # Store as [x, y] = [lon, lat] for ray casting
     return corners
 
 
 def point_in_polygon(point, polygon):
     """
     Check if a point is inside a polygon using ray casting algorithm.
+    Point should be [lat, lon], polygon should be list of [lon, lat] tuples.
     Returns True if point is inside polygon, False otherwise.
     """
     lat, lon = point
+    x, y = lon, lat  # Convert to (x, y) = (lon, lat) for algorithm
     n = len(polygon)
     inside = False
     
     j = n - 1
     for i in range(n):
-        xi, yi = polygon[i]
-        xj, yj = polygon[j]
+        xi, yi = polygon[i]  # xi = lon, yi = lat
+        xj, yj = polygon[j]  # xj = lon, yj = lat
         
-        if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi):
+        # Ray casting: check if ray from point crosses edge
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
             inside = not inside
         j = i
     
@@ -173,6 +176,7 @@ def main():
     for idx, (image_id, image_data) in enumerate(downloaded_ids.items(), 1):
         if idx % 2000 == 0:
             print(f"Processed {idx}/{total_images} images...")
+            print(f"  Assigned so far: {sum(box_counts.values())}, Unassigned: {unassigned_count}")
         
         lat = image_data.get("lat")
         lon = image_data.get("lon")
