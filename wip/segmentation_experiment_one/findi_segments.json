@@ -7,7 +7,7 @@
 				"lon": "-122.422019"
 			},
 			"ne": {
-				"_comment": "799 Broadway Suite 105"
+				"_comment": "799 Broadway Suite 105",
 				"lat": "37.797402",
 				"lon": "-122.410242"
 			},
@@ -17,14 +17,14 @@
 				"lon": "-122.415344"
 			},
 			"se": {
-				"_comment": "Lotta's Fountain"
+				"_comment": "Lotta's Fountain",
 				"lat": "37.787921",
 				"lon": "-122.403330"
 			}
 		},
 		"northeast": {
 			"nw": {
-				"_comment": "799 Broadway Suite 105"
+				"_comment": "799 Broadway Suite 105",
 				"lat": "37.797402",
 				"lon": "-122.410242"
 			},
@@ -34,7 +34,7 @@
 				"lon": "-122.403854"
 			},
 			"sw": {
-				"_comment": "Lotta's Fountain"
+				"_comment": "Lotta's Fountain",
 				"lat": "37.787921",
 				"lon": "-122.403330"
 			},
@@ -51,7 +51,7 @@
 				"lon": "-122.415344"
 			},
 			"ne": {
-				"_comment": "Lotta's Fountain"
+				"_comment": "Lotta's Fountain",
 				"lat": "37.787921",
 				"lon": "-122.403330"
 			},
@@ -68,7 +68,7 @@
 		},
 		"southeast": {
 			"nw": {
-				"_comment": "Lotta's Fountain"
+				"_comment": "Lotta's Fountain",
 				"lat": "37.787921",
 				"lon": "-122.403330"
 			},
