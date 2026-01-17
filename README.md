@@ -15,9 +15,14 @@ Later I trained a 30k iteration version too that made some interesting internal 
 
 ![v.01 - 30k iterations - Image 1](./assets/sf_findi_run/v_0.1_30k_image_1.png)
 
-Sitrep Log -- January 17, 2026
 
-I am still working on this. After waiting for almost a month for the ~600k+ images or so to download, I realized a new type of algorithm is needed to make this work.
+---
+
+# Logs
+
+**January 17, 2026**
+
+After waiting for almost a month for the ~600k+ images or so to download, I realized a new type of algorithm is needed to make this work.
 
 Logically, it's rebudant to, for example, compare an image in the South of a city with one in the North. If [as they most likely will] are not related, it's wasted computation, and if they are, it's a false positive.
 
@@ -29,6 +34,6 @@ For whatever reason, my initial downloading algorithm didn't get all the images 
 
 The good news is that it did download Sunset district OK, which should be enough for what I wanted to test. 
 
-Contextualized, this means there is so much more potential once all the images are queried from Mapillary. There, each road (and in particular the FinDi) is sprawling with images. If my initial approach work, it'll be tougher to do the raw data work than the reconstruction. 
+Contextualized, this means there is so much more potential once all the images are queried from Mapillary. There, each road (and in particular the FinDi) is sprawling with images. If my initial approach works, it'll be tougher to do the raw data work than the reconstruction. 
 
 Now I'll have to change some things so the experiments work on the Sunset, but asides that, I'm very happy I ended up going for the harder approach and pulling the coordinates. This explains why a lot of my earlier experiments focused on the FinDi failed. 
