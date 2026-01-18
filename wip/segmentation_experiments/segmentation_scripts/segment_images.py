@@ -1,3 +1,8 @@
+"""
+This script is meant to be run only inside the lambda where the files are present
+from the cityzero-sf directory. It organizes images into boxes based on GPS coordinates
+by reading segment definitions from a JSON file.
+"""
 import argparse
 import json
 import os
@@ -10,7 +15,6 @@ GEODATA_DIR = Path("data/geodata")
 RAW_IMAGES_DIR = Path("data/raw")
 OUTPUT_DIR = Path("data/geodata/image_boxes")
 METADATA_FILE = GEODATA_DIR / "download_metadata.json"
-SEGMENTS_FILE = GEODATA_DIR / "findi_segments.json"
 
 BOX_NAME_MAPPING = {
     "northwest": "nw",
@@ -28,8 +32,8 @@ def parse_arguments():
     parser.add_argument(
         "--boxes",
         type=str,
-        default=str(SEGMENTS_FILE),
-        help=f"Path to boxes JSON file (default: {SEGMENTS_FILE})"
+        required=True,
+        help="Path to boxes JSON file"
     )
     return parser.parse_args()
 
