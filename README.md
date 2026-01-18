@@ -28,7 +28,7 @@ Logically, it's rebudant to, for example, compare an image in the South of a cit
 
 So I'm working on using geofencing and clustering to make this work. I had to wait another week for Mapillary's API to fetch the latitude/longitude of each image I had downloaded before, and while running some tests, I ran into something interesting (if not catastrophic):
 
-![Scatter Plot showing the coordinates for each downloaded image in the dataset](./assets/sf_dataset_scatter/coordinates_scatter.png)
+![Scatter Plot showing the coordinates for each downloaded image in the dataset](./assets/scatter_plots/sf_scatter.png)
 
 For whatever reason, my initial downloading algorithm didn't get all the images of the city. It missed a huge chunk of the Financial District and only caught mini-clusters within. 
 
@@ -37,3 +37,9 @@ The good news is that it did download Sunset district OK, which should be enough
 Contextualized, this means there is so much more potential once all the images are queried from Mapillary. There, each road (and in particular the FinDi) is sprawling with images. If my initial approach works, it'll be tougher to do the raw data work than the reconstruction. 
 
 Now I'll have to change some things so the experiments work on the Sunset, but asides that, I'm very happy I ended up going for the harder approach and pulling the coordinates. This explains why a lot of my earlier experiments focused on the FinDi failed. 
+
+**January 18, 2026**
+
+I've now made a new set of boxes of the sunset district based on what I found yesterday. They seem promising!
+
+![Scatter Plot showing images within the Sunset district segmentation boxes](./assets/scatter_plots/sunset_scatter.png)
