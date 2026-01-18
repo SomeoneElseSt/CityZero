@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import shutil
@@ -19,6 +20,18 @@ BOX_NAME_MAPPING = {
 }
 
 CENTER_TOLERANCE = 0.0001  # Tolerance for considering a point as "at center"
+
+
+def parse_arguments():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Organize images into boxes based on GPS coordinates")
+    parser.add_argument(
+        "--boxes",
+        type=str,
+        default=str(SEGMENTS_FILE),
+        help=f"Path to boxes JSON file (default: {SEGMENTS_FILE})"
+    )
+    return parser.parse_args()
 
 
 def load_json_file(file_path):
@@ -140,9 +153,16 @@ def copy_image_to_box(image_id, box_folder):
 
 def main():
     """Main function to organize images into boxes."""
+    args = parse_arguments()
+    segments_file = Path(args.boxes)
+    
+    if not segments_file.exists():
+        print(f"Error: Boxes file not found: {segments_file}")
+        return
+    
     print("Loading metadata and segment data...")
     metadata = load_json_file(METADATA_FILE)
-    segments_data = load_json_file(SEGMENTS_FILE)
+    segments_data = load_json_file(segments_file)
     
     print(f"Found {metadata.get('total_downloaded', 0)} downloaded images in metadata")
     
