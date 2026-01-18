@@ -156,6 +156,10 @@ def main():
     args = parse_arguments()
     segments_file = Path(args.boxes)
     
+    if not str(segments_file).endswith(".json"):
+        print(f"Error: Boxes file must be a JSON file (.json): {segments_file}")
+        return
+    
     if not segments_file.exists():
         print(f"Error: Boxes file not found: {segments_file}")
         return
