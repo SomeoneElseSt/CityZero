@@ -1,0 +1,92 @@
+{
+	"boxes": {
+		"northwest": {
+			"nw": {
+				"_comment": "Golden Gate Park NW Edge",
+				"lat": "37.764467",
+				"lon": "-122.510409"
+			},
+			"ne": {
+				"_comment": "Golden Gate Park N Edge",
+				"lat": "37.764814",
+				"lon": "-122.492347"
+			},
+			"sw": {
+				"_comment": "4400 Pacheco St",
+				"lat": "37.749093",
+				"lon": "-122.507869"
+			},
+			"se": {
+				"_comment": "2999 Pacheco St",
+				"lat": "37.749776",
+				"lon": "-122.492265"
+			}
+		},
+		"northeast": {
+			"nw": {
+				"_comment": "Golden Gate Park N Edge",
+				"lat": "37.764814",
+				"lon": "-122.492347"
+			},
+			"ne": {
+				"_comment": "Lincoln Way",
+				"lat": "37.765469",
+				"lon": "-122.477022"
+			},
+			"sw": {
+				"_comment": "2999 Pacheco St",
+				"lat": "37.749776",
+				"lon": "-122.492265"
+			},
+			"se": {
+				"_comment": "Shoreline Hwy",
+				"lat": "37.750617",
+				"lon": "-122.475733"
+			}
+		},
+		"southwest": {
+			"nw": {
+				"_comment": "4400 Pacheco St",
+				"lat": "37.749093",
+				"lon": "-122.507869"
+			},
+			"ne": {
+				"_comment": "2999 Pacheco St",
+				"lat": "37.749776",
+				"lon": "-122.492265"
+			},
+			"sw": {
+				"_comment": "3699 Vicente St",
+				"lat": "37.737950",
+				"lon": "-122.506456"
+			},
+			"se": {
+				"_comment": "2600-2666 Sunset Blvd",
+				"lat": "37.738337",
+				"lon": "-122.494243"
+			}
+		},
+		"southeast": {
+			"nw": {
+				"_comment": "2999 Pacheco St",
+				"lat": "37.749776",
+				"lon": "-122.492265"
+			},
+			"ne": {
+				"_comment": "Shoreline Hwy",
+				"lat": "37.750617",
+				"lon": "-122.475733"
+			},
+			"sw": {
+				"_comment": "2600-2666 Sunset Blvd",
+				"lat": "37.738337",
+				"lon": "-122.494243"
+			},
+			"se": {
+				"_comment": "Inner Parkside",
+				"lat": "37.739385",
+				"lon": "-122.475088"
+			}
+		}
+	}
+}
