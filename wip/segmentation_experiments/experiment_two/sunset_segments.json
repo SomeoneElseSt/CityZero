@@ -61,9 +61,9 @@
 				"lon": "-122.506456"
 			},
 			"se": {
-				"_comment": "2600-2666 Sunset Blvd",
-				"lat": "37.738337",
-				"lon": "-122.494243"
+				"_comment": "2299 Vicente St",
+				"lat": "37.738631",
+				"lon": "-122.491520"
 			}
 		},
 		"southeast": {
@@ -78,9 +78,9 @@
 				"lon": "-122.475733"
 			},
 			"sw": {
-				"_comment": "2600-2666 Sunset Blvd",
-				"lat": "37.738337",
-				"lon": "-122.494243"
+				"_comment": "2299 Vicente St",
+				"lat": "37.738631",
+				"lon": "-122.491520"
 			},
 			"se": {
 				"_comment": "Inner Parkside",
