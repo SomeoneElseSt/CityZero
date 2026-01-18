@@ -9,6 +9,14 @@ import os
 import shutil
 import random
 from pathlib import Path
+from datetime import datetime
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("Error: matplotlib is not installed.")
+    print("Please install it with: pip install matplotlib")
+    exit(1)
 
 # Constants
 GEODATA_DIR = Path("data/geodata")
@@ -24,6 +32,21 @@ BOX_NAME_MAPPING = {
 }
 
 CENTER_TOLERANCE = 0.0001  # Tolerance for considering a point as "at center"
+
+# Color mapping for scatter plot
+BOX_COLORS = {
+    "nw": "#FF6B6B",  # Red
+    "ne": "#4A90E2",  # Blue
+    "sw": "#50C878",  # Green
+    "se": "#FF8C42",  # Orange
+}
+
+BOX_LABELS = {
+    "nw": "Northwest",
+    "ne": "Northeast",
+    "sw": "Southwest",
+    "se": "Southeast",
+}
 
 
 def parse_arguments():
@@ -155,6 +178,71 @@ def copy_image_to_box(image_id, box_folder):
     return True
 
 
+def create_scatter_plot(assigned_images, boxes_filename, output_dir):
+    """Create scatter plot of assigned images colored by box."""
+    if not assigned_images:
+        print("Warning: No images to plot")
+        return None
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    boxes_name = Path(boxes_filename).stem
+    plot_filename = f"verification_scatter_{boxes_name}_{timestamp}.png"
+    plot_path = output_dir / plot_filename
+    
+    print(f"\nCreating scatter plot: {plot_filename}")
+    
+    # Prepare data by box
+    box_data = {
+        "nw": {"lats": [], "lons": []},
+        "ne": {"lats": [], "lons": []},
+        "sw": {"lats": [], "lons": []},
+        "se": {"lats": [], "lons": []},
+    }
+    
+    for image_info in assigned_images:
+        box = image_info["box"]
+        if box in box_data:
+            box_data[box]["lats"].append(image_info["lat"])
+            box_data[box]["lons"].append(image_info["lon"])
+    
+    # Create plot
+    plt.figure(figsize=(14, 12))
+    
+    for box_code in ["nw", "ne", "sw", "se"]:
+        coords = box_data[box_code]
+        if coords["lats"]:
+            color = BOX_COLORS.get(box_code, "#808080")
+            label = BOX_LABELS.get(box_code, box_code)
+            count = len(coords["lats"])
+            plt.scatter(
+                coords["lons"],
+                coords["lats"],
+                alpha=0.4,
+                s=2,
+                c=color,
+                label=f"{label} ({count:,})"
+            )
+    
+    plt.xlabel("Longitude", fontsize=12)
+    plt.ylabel("Latitude", fontsize=12)
+    plt.title(
+        f"Segmentation Verification - {boxes_name}\n"
+        f"Total assigned images: {len(assigned_images):,}\n"
+        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        fontsize=14
+    )
+    plt.legend(loc="upper right", fontsize=10)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
+    print(f"Scatter plot saved to: {plot_path}")
+    plt.close()
+    
+    return plot_path
+
+
 def main():
     """Main function to organize images into boxes."""
     args = parse_arguments()
@@ -182,10 +270,11 @@ def main():
     boxes_data = segments_data["boxes"]
     box_names = list(BOX_NAME_MAPPING.values())
     
-    # Initialize counters
+    # Initialize counters and data collection
     box_counts = {box: 0 for box in box_names}
     center_count = 0
     unassigned_count = 0
+    assigned_images = []  # Collect lat/lon/box for successfully assigned images
     
     # Create output directory
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -229,12 +318,21 @@ def main():
         box_folder = OUTPUT_DIR / box_code
         if copy_image_to_box(image_id, box_folder):
             box_counts[box_code] += 1
+            # Collect data for scatter plot
+            assigned_images.append({
+                "lat": float(lat),
+                "lon": float(lon),
+                "box": box_code
+            })
     
     # Create/update READMEs with final counts
     print("\nCreating README files with final counts...")
     for full_name, box_code in BOX_NAME_MAPPING.items():
         box_folder = OUTPUT_DIR / box_code
         create_readme(box_folder, box_code, full_name, box_counts[box_code])
+    
+    # Create scatter plot
+    plot_path = create_scatter_plot(assigned_images, segments_file.name, Path.cwd())
     
     # Print summary
     print("\n" + "="*50)
@@ -247,6 +345,8 @@ def main():
     print(f"\nImages at center (randomly assigned): {center_count}")
     print(f"Unassigned images: {unassigned_count}")
     print(f"\nOutput directory: {OUTPUT_DIR.absolute()}")
+    if plot_path:
+        print(f"Scatter plot: {plot_path.absolute()}")
 
 
 if __name__ == "__main__":
