@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate image pairs for each bounding box directory.
-Reads {dir}_images.txt files and creates {dir}_pairs.txt with all combinations.
+Reads {dir}_images.txt files and creates {dir}_pairs.txt with all combinations for exhaustive matching. To be ran from cityzero-sf inside instance.
 """
 
 import itertools
