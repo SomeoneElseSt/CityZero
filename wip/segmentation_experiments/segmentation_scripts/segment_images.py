@@ -6,7 +6,6 @@ by reading segment definitions from a JSON file.
 import argparse
 import json
 import os
-import shutil
 import random
 from pathlib import Path
 from datetime import datetime
@@ -20,7 +19,6 @@ except ImportError:
 
 # Constants
 GEODATA_DIR = Path("data/geodata")
-RAW_IMAGES_DIR = Path("data/raw")
 OUTPUT_DIR = Path("data/geodata/image_boxes")
 METADATA_FILE = GEODATA_DIR / "download_metadata.json"
 
@@ -166,16 +164,13 @@ the bounding box defined for the {full_box_name} region.
         f.write(content)
 
 
-def copy_image_to_box(image_id, box_folder):
-    """Copy image file from raw directory to box folder."""
-    source_file = RAW_IMAGES_DIR / f"{image_id}.jpg"
-    if not source_file.exists():
-        print(f"Warning: Image {image_id} not found in {RAW_IMAGES_DIR}")
-        return False
-    
-    dest_file = box_folder / f"{image_id}.jpg"
-    shutil.copy2(source_file, dest_file)
-    return True
+def write_image_list(box_folder, box_code, image_ids):
+    """Write image IDs to {box_code}_images.txt file."""
+    images_file = box_folder / f"{box_code}_images.txt"
+    with open(images_file, "w") as f:
+        for image_id in sorted(image_ids):
+            f.write(f"{image_id}.jpg\n")
+    return images_file
 
 
 def create_scatter_plot(assigned_images, boxes_filename, output_dir):
@@ -272,6 +267,7 @@ def main():
     
     # Initialize counters and data collection
     box_counts = {box: 0 for box in box_names}
+    box_image_ids = {box: [] for box in box_names}
     center_count = 0
     unassigned_count = 0
     assigned_images = []  # Collect lat/lon/box for successfully assigned images
@@ -314,16 +310,23 @@ def main():
         if is_at_center(point, center_point):
             center_count += 1
         
-        # Copy image to box folder
+        # Collect image ID for this box
+        box_image_ids[box_code].append(image_id)
+        box_counts[box_code] += 1
+        # Collect data for scatter plot
+        assigned_images.append({
+            "lat": float(lat),
+            "lon": float(lon),
+            "box": box_code
+        })
+    
+    # Write image lists to text files
+    print("\nWriting image lists to text files...")
+    for full_name, box_code in BOX_NAME_MAPPING.items():
         box_folder = OUTPUT_DIR / box_code
-        if copy_image_to_box(image_id, box_folder):
-            box_counts[box_code] += 1
-            # Collect data for scatter plot
-            assigned_images.append({
-                "lat": float(lat),
-                "lon": float(lon),
-                "box": box_code
-            })
+        if box_image_ids[box_code]:
+            images_file = write_image_list(box_folder, box_code, box_image_ids[box_code])
+            print(f"  Wrote {len(box_image_ids[box_code])} image IDs to {images_file}")
     
     # Create/update READMEs with final counts
     print("\nCreating README files with final counts...")
