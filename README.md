@@ -43,3 +43,11 @@ Now I'll have to change some things so the experiments work on the Sunset, but a
 I've now made a new set of boxes of the sunset district based on what I found yesterday. They seem promising!
 
 ![Scatter Plot showing images within the Sunset district segmentation boxes](./assets/scatter_plots/sunset_scatter.png)
+
+**January 19, 2026**
+
+Mostly worked on infra -- I injected the GPS coordinates of each image I had gotten from Mapillary's API into the database I got after feature extraction. It should help COLMAP match images in box edges using a spatial matcher (although it does make me wonder if using a spatial matcher standalone could work as well).
+
+I also realized COLMAP does custom matches using a .txt list of <img1> <img2>, so there was no need to copy images into a folder per box. It would've been enough with creating the .txt files (I'll modify the script for box-making to reflect this.).
+
+In either case, both of the above are done. Now I just have to wire up the script to put it all together. 
