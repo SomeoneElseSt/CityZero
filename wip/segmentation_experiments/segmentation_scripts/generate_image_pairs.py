@@ -54,10 +54,14 @@ def generate_pairs_for_directory(directory_name):
         print(f"Warning: {directory_name} has less than 2 images, skipping")
         return
     
+    print(f"Processing {directory_name}: {len(images)} images")
+    num_pairs = len(images) * (len(images) - 1) // 2
+    print(f"  Expected pairs: {num_pairs:,}")
+    
     pairs = list(itertools.combinations(images, 2))
     write_pairs(pairs_file, pairs)
     
-    print(f"Generated {len(pairs)} pairs for {directory_name} -> {pairs_file}")
+    print(f"✓ Generated {len(pairs):,} pairs for {directory_name} -> {pairs_file}")
 
 
 def main():
