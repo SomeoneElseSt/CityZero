@@ -49,9 +49,10 @@ wip/outputs/
 # Cache
 wip/scripts/uploaded_images.json
 
-# Google Drive secrets
+# Backup Secrets
 wip/scripts/token.json
 wip/scripts/credentials.json
+wip/backblaze/
 
 # IDE
 .vscode/
