@@ -41,7 +41,7 @@ def feature_match(database_path, match_list_path) -> None:
         "--match_type", "pairs", 
         "--FeatureMatching.use_gpu", "1",  # Use GPU for matching
         "--FeatureMatching.gpu_index", "-1", # Auto-detect GPU
-        "--FeatureMatching.num_threads", "30",  # Lambda's AMD EPYC 7J13
+        "--FeatureMatching.num_threads", "-1",  # Detect Automatically the # of threads
         "--FeatureMatching.guided_matching", "1", 
     ]
 
