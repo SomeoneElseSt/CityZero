@@ -8,7 +8,7 @@ This script iteratively expands match connectivity by:
 4. Repeating for N rounds to densify the match graph
 
 The expansion helps bridge spatial partitions and improve reconstruction
-connectivity without exhaustive pairwise matching.
+connectivity without exhaustive pairwise matching. It helps reconstruct the scene more densely as parts that were far away can still be reconnected as necessary.
 """
 
 import argparse
@@ -169,6 +169,27 @@ def run_expansion_round(round_num: int,
     return len(new_proposals)
 
 
+def cleanup_temp_files(output_dir: Path) -> None:
+    """
+    Delete all temporary .txt files created during expansion rounds.
+    
+    Removes all files matching expansion_round_*.txt pattern in output_dir.
+    """
+    if not output_dir.exists():
+        return
+    
+    deleted_count = 0
+    for temp_file in output_dir.glob("expansion_round_*.txt"):
+        try:
+            temp_file.unlink()
+            deleted_count += 1
+        except OSError as e:
+            print(f"Warning: Failed to delete {temp_file}: {e}")
+    
+    if deleted_count > 0:
+        print(f"Deleted {deleted_count} temporary .txt file(s)")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Iteratively expand COLMAP match graph using transitive matching"
@@ -196,6 +217,12 @@ def main():
         type=int,
         default=4,
         help="Number of expansion rounds (default: 4)"
+    )
+    parser.add_argument(
+        "--temp_files",
+        action="store_true",
+        default=False,
+        help="Delete temporary .txt files after completion (default: False)"
     )
     
     args = parser.parse_args()
@@ -234,6 +261,10 @@ def main():
     print("\n" + "="*60)
     print("Query expansion complete!")
     print("="*60)
+    
+    # Cleanup temporary files if requested
+    if args.temp_files:
+        cleanup_temp_files(output_dir)
 
 
 if __name__ == "__main__":
