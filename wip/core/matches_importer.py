@@ -38,7 +38,7 @@ def feature_match(database_path, match_list_path) -> None:
     print("Feature matching using custom pair list")
 
     print("\nIMPORTANT: If your database has a large number of features, there may be a 5-15 minute delay between COLMAPs first output (e.g., assigning GPU workers) and it actually running")
-    print("This is expected, so do not quit the process")
+    print("\nThis is expected, so do not quit the process\n")
 
     cmd = [
         "colmap",
