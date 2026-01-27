@@ -51,3 +51,24 @@ Mostly worked on infra -- I injected the GPS coordinates of each image I had got
 I also realized COLMAP does custom matches using a .txt list of <img1> <img2>, so there was no need to copy images into a folder per box. It would've been enough with creating the .txt files (I'll modify the script for box-making to reflect this.).
 
 In either case, both of the above are done. Now I just have to wire up the script to put it all together. 
+
+**January 27, 2026**
+
+After being away for a sabbatical I've come back with some new ideas. 
+
+First, I'm still going to use boxes for localized reconstructions. I think this is good because if I ever want to update a box, I won't have to re-feature match and reconstruct the entire dataset. There are ways to register images into an existing reconstruction in COLMAP.
+
+Second, I'm not going to use an exhaustive matcher within the boxes. I'll use an spatial matcher. It's [way] less computationally expensive. Empirically, a box with 11000 images only uses 300k+ or so comparisons. An exhaustive matcher would've needed 121 Million. Not great.
+
+Third, I'll only use an exhaustive matcher with query expansion to connect images at the fringes of each box. This should, on paper, provide enough conectivity during reconstruction, and it aligns with how the Rome paper succeeded connecting diseparate clusters. 
+
+I ran spatial feature matching on each box. I now have to work on matching at the fringes. Once that's done I'll finally be able to start reconstructing. I currently have got 1.1M matches or so, so I'm aiming to keep it under 2M, just to see how long it takes on Lambda. 
+
+I'm not 100% sure of wether this approach is optimal (although I am confident it'll work), because, given that I do know each image's GPS coordinates, I could theoretically just use a spatial matcher always. Both for in-box matching and at the fringes.
+
+However, given that COLMAP spatial_matcher doesn't ingest custom lists, and reconnecting boxes isn't just about connecting close images (imagine for instance, reconnecting a valley. If only close images were feature matched, images at the top of the valley with new information might be ignored. Query expansion solves this for sure.), it more likely than not is better to use some version of exhaustive matching at the fringes. 
+
+Down the line, I might only use query expansion with a Vocab tree or Deep Clustering. We'll see.
+
+A fun note: I asked ChatGPT, based on this log, what the likely profile of the person writing it may be. It said it might be of someone "slightly masochistic (in a good way)", which I found rather hilarious. 
+
