@@ -25,6 +25,8 @@ Flags:
     --output_path
         Directory path for output pair files
 
+IMPORTANT: the resulting pairs will not be O(n^2) because identical pairs with a different order and self-pairs are discounted. The correct calculation is N * (N -1) / 2.
+
 """
 
 import argparse
