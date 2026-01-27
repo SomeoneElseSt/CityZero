@@ -19,7 +19,7 @@ from pathlib import Path
 from collections import defaultdict
 from typing import Set, List, Tuple
 
-# Constants
+# Decodes Image ID Pairs, stored as 32-bit signed ints
 PAIR_ID_MULTIPLIER = 2147483647
 
 
@@ -29,10 +29,6 @@ def load_existing_pairs(db_path: str, min_matches: int) -> Set[Tuple[int, int]]:
     
     Returns set of (img1, img2) tuples where img1 < img2 and rows >= min_matches.
     """
-    if not Path(db_path).exists():
-        print(f"Database not found: {db_path}")
-        sys.exit(1)
-    
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
@@ -103,10 +99,6 @@ def filter_existing_pairs(candidates: List[Tuple[int, int]],
 
 def write_pair_file(pairs: List[Tuple[int, int]], output_path: Path) -> None:
     """Write image pairs to text file (one pair per line, space-separated)."""
-    if not pairs:
-        print(f"No pairs to write to {output_path}")
-        return
-    
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     with open(output_path, 'w') as f:
