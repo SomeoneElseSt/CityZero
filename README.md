@@ -76,9 +76,9 @@ A fun note: I asked ChatGPT, based on this log, what the likely profile of the p
 
 I've been working on this fully since I wrote yesterday's note. 
 
-One very interesting observation whilst doing query expansion is that everything seems to be scaling linearly. That is, the number of images with 30 > matches almost exactly doubles at each round, as does the block size, and correspondingly the time it takes to expand the image graph. 
+One very interesting observation whilst doing query expansion is that everything seems to be scaling exponentially. That is, the number of images with 30 > inliers (worthy pairs by)  almost exactly doubles at each round, as does the block size, and correspondingly the time it takes to expand the image graph. 
 
-It's rather promising. 
+This is rather promising because given that the starting number of image pairs is so low, even at 4k blocks (my higher bound so far), each taking 3s in average, that would only take 3 hours total (and about 10hrs considering all the other rounds. Considering it's enabled effectively quadrupling the graph's density (from ~130k image pairs with 30 > inliers to ~600k), it's a major computational win. Using an exhaustive matcher for a similar effect would've taken 38,000 × 37,999 / 2 = 722,038,000 pair comparisons instead! The query expansion approach is better by at least a magnitude if not two, since so far it's only proposed < 10M comparisons total across all rounds + the 1M-2M from in-box matching and fringe matching.
 
 As for the rest, fringe matching went fine. It may be worth tweaking how many meters are allocated to each box. Query expansion seems to be working wonderfully so far. I expect the reconstruction to be very coherent, and hopefully it won't take forever. This is the first time since months I'll run a mapper, so fingers crossed.
 
