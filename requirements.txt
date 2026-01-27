@@ -1,0 +1,12 @@
+shapely
+pyproj
+python-dotenv
+tqdm
+requests
+mapillary
+numpy
+matplotlib
+yt-dlp
+google-auth
+google-auth-oauthlib
+google-api-python-client
