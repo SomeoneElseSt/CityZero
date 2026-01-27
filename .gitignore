@@ -37,6 +37,7 @@ outputs/renders/*
 !outputs/models/.gitkeep
 !outputs/renders/.gitkeep
 data/download_metadata.json
+wip/segmentation_experiments/experiment_two/fringes
 
 # WIP data and outputs
 wip/*/images/
