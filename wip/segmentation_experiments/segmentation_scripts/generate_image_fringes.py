@@ -11,6 +11,20 @@ This script:
 6. Generates exhaustive pair lists with canonical ordering
 7. Outputs pair files ready for COLMAP matches_importer
 8. Exports fringe geometries and visualization
+
+Flags:
+    --box_coords
+        Path to JSON file with box corner coordinates
+
+    --gps_coords
+        Path to JSON file mapping image_id → {lat, lon}
+
+    --fringe_length
+        Total width of fringe zone in meters (default: 50.0)
+
+    --output_path
+        Directory path for output pair files
+
 """
 
 import argparse
