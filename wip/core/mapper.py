@@ -1,6 +1,10 @@
 """
 Reconstruction step using COLMAP mapper
 
+Assuming a well connected image graph thanks to query expansion, it uses a normal mapper with fairly default settings. 
+
+If reconstructions fail to converge, it'd be worth trying a hierarchical_mapper instead. 
+
 """
 
 import argparse
@@ -47,10 +51,11 @@ def reconstruction(database_path, image_path, output_path, image_list_path) -> N
         "--database_path", str(database_path),
         "--image_path", str(image_path),
         "--output_path", str(output_path),
-        "--image_list_path", str(image_list_path),
+        "--Mapper.image_list_path", str(image_list_path),
         "--Mapper.ba_use_gpu", "1",
-        "--Mapper.ba_gpu_index", "-1",  # Auto-detect GPU
-        "--Mapper.num_threads", "-1",  # Auto-detect threads
+        "--Mapper.ba_gpu_index", "-1",      # Auto-detect GPU
+        "--Mapper.num_threads", "-1",       # Auto-detect threads
+        "--Mapper.ignore_watermarks", "1",  # Ignore Watermarks
     ]
 
     try:
