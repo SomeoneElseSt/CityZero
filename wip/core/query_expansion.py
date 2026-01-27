@@ -17,10 +17,33 @@ import subprocess
 import sys
 from pathlib import Path
 from collections import defaultdict
-from typing import Set, List, Tuple
+from typing import Set, List, Tuple, Dict
 
 # Decodes Image ID Pairs, stored as 32-bit signed ints
 PAIR_ID_MULTIPLIER = 2147483647
+
+
+def load_image_id_to_name(db_path: str) -> Dict[int, str]:
+    """
+    Load image_id -> name mapping from the images table.
+    
+    Returns dictionary mapping image_id to image filename.
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("SELECT image_id, name FROM images")
+        rows = cursor.fetchall()
+    except sqlite3.Error as e:
+        print(f"Database query failed: {e}")
+        conn.close()
+        sys.exit(1)
+    
+    id_to_name = {image_id: name for image_id, name in rows}
+    conn.close()
+    print(f"Loaded {len(id_to_name)} image ID to name mappings")
+    return id_to_name
 
 
 def load_existing_pairs(db_path: str, min_matches: int) -> Set[Tuple[int, int]]:
@@ -97,13 +120,31 @@ def filter_existing_pairs(candidates: List[Tuple[int, int]],
     return filtered
 
 
-def write_pair_file(pairs: List[Tuple[int, int]], output_path: Path) -> None:
-    """Write image pairs to text file (one pair per line, space-separated)."""
+def write_pair_file(pairs: List[Tuple[int, int]], output_path: Path, id_to_name: Dict[int, str]) -> None:
+    """
+    Write image pairs to text file (one pair per line, space-separated).
+    
+    Writes image filenames instead of IDs, as required by COLMAP's matches_importer.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
+    missing_names = []
+    for img1_id, img2_id in pairs:
+        if img1_id not in id_to_name:
+            missing_names.append(img1_id)
+        if img2_id not in id_to_name:
+            missing_names.append(img2_id)
+    
+    if missing_names:
+        unique_missing = set(missing_names)
+        print(f"Error: Missing names for {len(unique_missing)} image ID(s): {sorted(unique_missing)[:10]}")
+        sys.exit(1)
+    
     with open(output_path, 'w') as f:
-        for img1, img2 in pairs:
-            f.write(f"{img1} {img2}\n")
+        for img1_id, img2_id in pairs:
+            img1_name = id_to_name[img1_id]
+            img2_name = id_to_name[img2_id]
+            f.write(f"{img1_name} {img2_name}\n")
     
     print(f"Wrote {len(pairs)} pairs to {output_path}")
 
@@ -136,7 +177,8 @@ def run_matches_importer(database_path: str, match_list_path: str) -> None:
 def run_expansion_round(round_num: int, 
                        database_path: str, 
                        output_dir: Path,
-                       min_matches: int) -> int:
+                       min_matches: int,
+                       id_to_name: Dict[int, str]) -> int:
     """
     Execute one round of query expansion.
     
@@ -161,7 +203,7 @@ def run_expansion_round(round_num: int,
     
     # Write proposals to file
     pair_file = output_dir / f"expansion_round_{round_num}.txt"
-    write_pair_file(new_proposals, pair_file)
+    write_pair_file(new_proposals, pair_file, id_to_name)
     
     # Verify proposals with COLMAP
     run_matches_importer(database_path, str(pair_file))
@@ -239,6 +281,9 @@ def main():
     
     output_dir = Path(args.output_dir)
     
+    # Load image ID to name mapping
+    id_to_name = load_image_id_to_name(str(db_path))
+    
     print(f"\nQuery Expansion Configuration:")
     print(f"  Database: {db_path}")
     print(f"  Output directory: {output_dir}")
@@ -251,7 +296,8 @@ def main():
             round_num, 
             str(db_path), 
             output_dir,
-            args.min_matches
+            args.min_matches,
+            id_to_name
         )
         
         if proposals_count == 0:
