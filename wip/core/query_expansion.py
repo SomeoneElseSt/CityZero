@@ -9,6 +9,9 @@ This script iteratively expands match connectivity by:
 
 The expansion helps bridge spatial partitions and improve reconstruction
 connectivity without exhaustive pairwise matching. It helps reconstruct the scene more densely as parts that were far away can still be reconnected as necessary.
+
+IMPORTANT: Note that featurematching between blocks decreases exponentially, specially as proposed blocks become larger. Upon first running this script you may see 40s-30s load times for block processing. Expect it to average out at 3s per block.
+
 """
 
 import argparse
