@@ -72,3 +72,16 @@ Down the line, I might only use query expansion with a Vocab tree or Deep Cluste
 
 A fun note: I asked ChatGPT, based on this log, what the likely profile of the person writing it may be. It said it might be of someone "slightly masochistic (in a good way)", which I found rather hilarious. 
 
+**January 28, 2026**
+
+I've been working on this fully since I wrote yesterday's note. 
+
+One very interesting observation whilst doing query expansion is that everything seems to be scaling linearly. That is, the number of images with 30 > matches almost exactly doubles at each round, as does the block size, and correspondingly the time it takes to expand the image graph. 
+
+It's rather promising. 
+
+As for the rest, fringe matching went fine. It may be worth tweaking how many meters are allocated to each box. Query expansion seems to be working wonderfully so far. I expect the reconstruction to be very coherent, and hopefully it won't take forever. This is the first time since months I'll run a mapper, so fingers crossed.
+
+I've left the final query expansion round running with a mapper on stand-by. I'll wake up and either see a bug or a set of binaries. From there it'll be uphill to find a proper library for Gaussian reconstruction. Fun stuff!
+
+
