@@ -39,7 +39,6 @@ def install_dependencies() -> None:
         "libsqlite3-dev",
         "libglew-dev",
         "libcgal-dev",
-        "libceres-dev",
         "libcurl4-openssl-dev",
         "libssl-dev",
         "libmkl-full-dev",
@@ -77,6 +76,152 @@ def install_dependencies() -> None:
         sys.exit(1)
 
     print("All dependencies installed")
+
+
+def build_ceres_with_cuda() -> None:
+    """Build Ceres Solver from source with CUDA support."""
+    print("Installing CUDS...")
+    
+    cudss_deb = "cudss-local-repo-ubuntu2204-0.7.1_0.7.1-1_amd64.deb"
+    cudss_url = "https://developer.download.nvidia.com/compute/cudss/0.7.1/local_installers/cudss-local-repo-ubuntu2204-0.7.1_0.7.1-1_amd64.deb"
+    
+    print(f"Downloading CUDS installer...")
+    wget_result = subprocess.run(["wget", cudss_url], capture_output=True, text=True)
+    if wget_result.returncode != 0:
+        print(f"ERROR: Failed to download CUDS installer (exit code: {wget_result.returncode})")
+        if wget_result.stderr:
+            print(wget_result.stderr)
+        sys.exit(1)
+    
+    print("Installing CUDS repository...")
+    dpkg_result = subprocess.run(["sudo", "dpkg", "-i", cudss_deb], capture_output=True, text=True)
+    if dpkg_result.returncode != 0:
+        print(f"ERROR: Failed to install CUDS repository (exit code: {dpkg_result.returncode})")
+        if dpkg_result.stderr:
+            print(dpkg_result.stderr)
+        sys.exit(1)
+    
+    print("Copying CUDS keyring...")
+    keyring_src = "/var/cudss-local-repo-ubuntu2204-0.7.1/cudss-*-keyring.gpg"
+    keyring_dest = "/usr/share/keyrings/"
+    cp_result = subprocess.run(["sudo", "cp", keyring_src, keyring_dest], capture_output=True, text=True, shell=True)
+    if cp_result.returncode != 0:
+        print(f"ERROR: Failed to copy CUDS keyring (exit code: {cp_result.returncode})")
+        if cp_result.stderr:
+            print(cp_result.stderr)
+        sys.exit(1)
+    
+    print("Updating apt package list...")
+    env = dict(os.environ, 
+               DEBIAN_FRONTEND="noninteractive",
+               NEEDRESTART_MODE="a",
+               NEEDRESTART_SUSPEND="1")
+    update_result = subprocess.run(["sudo", "apt-get", "update"], env=env, capture_output=True, text=True)
+    if update_result.returncode != 0:
+        print(f"ERROR: Failed to update apt package list (exit code: {update_result.returncode})")
+        if update_result.stderr:
+            print(update_result.stderr)
+        sys.exit(1)
+    
+    print("Installing CUDS...")
+    install_result = subprocess.run(["sudo", "apt-get", "-y", "install", "cudss"], env=env, capture_output=True, text=True)
+    if install_result.returncode != 0:
+        print(f"ERROR: Failed to install CUDS (exit code: {install_result.returncode})")
+        if install_result.stderr:
+            print(install_result.stderr)
+        sys.exit(1)
+    
+    print("CUDS installed successfully")
+    
+    print("Building Ceres Solver from source with CUDA and cuDSS support")
+    
+    ceres_dir = Path.home() / "ceres-solver"
+    
+    if not ceres_dir.exists():
+        print("Cloning Ceres Solver repository...")
+        cmd = ["git", "clone", "https://github.com/ceres-solver/ceres-solver", str(ceres_dir)]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"ERROR: Failed to clone Ceres Solver (exit code: {result.returncode})")
+            if result.stderr:
+                print(result.stderr)
+            sys.exit(1)
+        print("Ceres Solver cloned")
+    else:
+        print(f"Ceres Solver already cloned at {ceres_dir}")
+    
+    print("Checking out version 2.2.0...")
+    checkout_cmd = ["git", "checkout", "2.2.0"]
+    result = subprocess.run(checkout_cmd, cwd=ceres_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"ERROR: Failed to checkout version 2.2.0 (exit code: {result.returncode})")
+        if result.stderr:
+            print(result.stderr)
+        sys.exit(1)
+    
+    build_dir = ceres_dir / "build"
+    build_dir.mkdir(exist_ok=True)
+    
+    print("\nConfiguring Ceres Solver with CMake...")
+    nvcc_path = resolve_nvcc_path()
+    if not nvcc_path:
+        print("ERROR: nvcc not found")
+        sys.exit(1)
+    
+    cmake_cmd = [
+        "cmake", "..",
+        "-GNinja",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DUSE_CUDA=ON",
+        "-DUSE_CUDSS=ON",
+        "-DCMAKE_CUDA_ARCHITECTURES=80",
+        "-DBUILD_SHARED_LIBS=ON",
+        "-DBUILD_TESTING=OFF",
+        "-DBUILD_EXAMPLES=OFF",
+    ]
+    
+    result = subprocess.run(cmake_cmd, cwd=build_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"ERROR: CMake configuration failed (exit code: {result.returncode})")
+        if result.stderr:
+            print(result.stderr)
+        sys.exit(1)
+    
+    print("CMake configuration complete")
+    
+    print("\nBuilding Ceres Solver...")
+    num_cores = multiprocessing.cpu_count()
+    build_cmd = ["ninja", "-j", str(num_cores)]
+    start_time = datetime.now()
+    
+    result = subprocess.run(build_cmd, cwd=build_dir, capture_output=True, text=True)
+    duration = (datetime.now() - start_time).total_seconds()
+    
+    if result.returncode != 0:
+        print(f"ERROR: Build failed after {duration:.1f} seconds (exit code: {result.returncode})")
+        if result.stderr:
+            print(result.stderr)
+        sys.exit(1)
+    
+    print(f"Ceres Solver built successfully in {duration/60:.1f} minutes")
+    
+    print("\nInstalling Ceres Solver...")
+    install_cmd = ["sudo", "ninja", "install"]
+    result = subprocess.run(install_cmd, cwd=build_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"ERROR: Installation failed (exit code: {result.returncode})")
+        if result.stderr:
+            print(result.stderr)
+        sys.exit(1)
+    
+    print("Registering new library...")
+    ldconfig_result = subprocess.run(["sudo", "ldconfig"], capture_output=True, text=True)
+    if ldconfig_result.returncode != 0:
+        print(f"WARNING: ldconfig failed (exit code: {ldconfig_result.returncode})")
+        if ldconfig_result.stderr:
+            print(ldconfig_result.stderr)
+    
+    print("Ceres Solver installed successfully")
 
 
 def resolve_nvcc_path() -> str | None:
@@ -190,6 +335,7 @@ if __name__ == "__main__":
     else:
         print("Skipping dependency installation (--skip-dependencies)")
 
+    build_ceres_with_cuda()
     build_colmap_from_source()
 
     print("\nBuild complete!")
