@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 import multiprocessing
+from glob import glob
 
 
 def run_command(cmd: list[str], error_msg: str, cwd: Path | None = None, env: dict | None = None, 
@@ -136,9 +137,14 @@ def build_ceres_with_cuda() -> None:
     run_command(["sudo", "dpkg", "-i", cudss_deb], "Failed to install CUDS repository")
     
     print("Copying CUDS keyring...")
-    keyring_src = "/var/cudss-local-repo-ubuntu2204-0.7.1/cudss-*-keyring.gpg"
+    keyring_pattern = "/var/cudss-local-repo-ubuntu2204-0.7.1/cudss-*-keyring.gpg"
+    keyring_files = glob(keyring_pattern)
+    if not keyring_files:
+        print(f"ERROR: No keyring files found matching {keyring_pattern}")
+        sys.exit(1)
+    keyring_src = max(keyring_files, key=os.path.getmtime)
     keyring_dest = "/usr/share/keyrings/"
-    run_command(["sudo", "cp", keyring_src, keyring_dest], "Failed to copy CUDS keyring", shell=True)
+    run_command(["sudo", "cp", keyring_src, keyring_dest], "Failed to copy CUDS keyring", capture_output=False)
     
     print("Updating apt package list...")
     env = dict(os.environ, 
@@ -331,6 +337,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Skip dependency installation (use if already installed)"
     )
+    parser.add_argument(
+        "--skip-ceres",
+        action="store_true",
+        help="Skip building and installing Ceres Solver"
+    )
 
     args = parser.parse_args()
 
@@ -341,7 +352,10 @@ if __name__ == "__main__":
     else:
         print("Skipping dependency installation (--skip-dependencies)")
 
-    build_ceres_with_cuda()
+    if not args.skip_ceres:
+        build_ceres_with_cuda()
+    else:
+        print("Skipping Ceres Solver build (--skip-ceres)")
     build_colmap_from_source()
 
     print("\nBuild complete!")
