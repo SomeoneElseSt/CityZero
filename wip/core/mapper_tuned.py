@@ -11,6 +11,7 @@ import argparse
 import os
 import subprocess
 import sys
+from datetime import datetime
 
 
 def reconstruction(database_path, image_path, output_path, image_list_path) -> None:
@@ -43,6 +44,9 @@ def reconstruction(database_path, image_path, output_path, image_list_path) -> N
         print(f"Creating output directory: {output_path}")
         os.makedirs(output_path, exist_ok=True)
 
+    timestamp = datetime.now().strftime("%d%m%Y")
+    log_file_path = f"{timestamp}_mapper_log.txt"
+
     print("Starting sparse reconstruction...")
 
     cmd = [
@@ -63,11 +67,20 @@ def reconstruction(database_path, image_path, output_path, image_list_path) -> N
         "--Mapper.abs_pose_min_inlier_ratio", "0.40",  # Almost twice as much as the default. Should significantly cut down on false positives and matches that aren't strong.
         "--Mapper.abs_pose_min_num_inliers", "80",     # Too many images are 30 > inliers, so this should cut down on easy matches and barely related images    ]
 
-    try:
-        result = subprocess.run(cmd, check=True, text=True)
-    except subprocess.CalledProcessError as e:
-        print(f"\nReconstruction failed with exit code: {e.returncode}")
-        sys.exit(1)
+    with open(log_file_path, 'w') as log_file:
+        try:
+            result = subprocess.run(cmd, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = result.stdout
+            print(output)
+            log_file.write(output)
+        except subprocess.CalledProcessError as e:
+            output = e.stdout if e.stdout else ""
+            error_msg = f"\nReconstruction failed with exit code: {e.returncode}\n"
+            print(output)
+            print(error_msg)
+            log_file.write(output)
+            log_file.write(error_msg)
+            sys.exit(1)
 
     print("\nReconstruction is done!")
     print(f"Sparse models saved to: {output_path}")
