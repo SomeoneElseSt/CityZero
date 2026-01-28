@@ -147,6 +147,19 @@ def build_ceres_with_cuda() -> None:
     
     print("CUDS installed successfully")
     
+    print("Removing CUDA 13 cuDSS packages to avoid libcublas.so.13 conflicts...")
+    cuda13_packages = [
+        "cudss-cuda-13",
+        "libcudss0-cuda-13", 
+        "libcudss0-dev-cuda-13",
+        "libcudss0-static-cuda-13"
+    ]
+    run_command(
+        ["sudo", "apt", "remove", "-y"] + cuda13_packages,
+        "Failed to remove CUDA 13 packages",
+        env=env
+    )
+    
     print("Building Ceres Solver from source with CUDA and cuDSS support")
     
     ceres_dir = Path.home() / "ceres-solver"
@@ -160,6 +173,9 @@ def build_ceres_with_cuda() -> None:
         print(f"Ceres Solver already cloned at {ceres_dir}")
         print("Pulling latest changes from master...")
         run_command(["git", "pull"], "Failed to pull latest changes", cwd=ceres_dir)
+    
+    print("Checking out master branch (cuDSS requires master, not stable 2.2.0)...")
+    run_command(["git", "checkout", "master"], "Failed to checkout master branch", cwd=ceres_dir)
     
     print("Initializing git submodules (including bundled abseil)...")
     run_command(["git", "submodule", "update", "--init", "--recursive"], "Failed to initialize git submodules", cwd=ceres_dir)
@@ -186,7 +202,6 @@ def build_ceres_with_cuda() -> None:
         "-GNinja",
         "-DCMAKE_BUILD_TYPE=Release",
         "-DUSE_CUDA=ON",
-        "-DUSE_CUDSS=ON",
         "-DCMAKE_CUDA_ARCHITECTURES=80",
         "-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/libcudss/12/cmake/cudss",
         "-DBUILD_SHARED_LIBS=ON",
