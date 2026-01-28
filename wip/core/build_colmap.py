@@ -54,8 +54,13 @@ def run_command(cmd: list[str], error_msg: str, cwd: Path | None = None, env: di
     if result.returncode != 0:
         prefix = "WARNING" if continue_on_error else "ERROR"
         print(f"{prefix}: {error_msg} (exit code: {result.returncode})")
-        if capture_output and result.stderr:
-            print(result.stderr)
+        if capture_output:
+            if result.stdout:
+                print("STDOUT:")
+                print(result.stdout)
+            if result.stderr:
+                print("STDERR:")
+                print(result.stderr)
         if not continue_on_error:
             sys.exit(1)
     
@@ -125,7 +130,7 @@ def build_ceres_with_cuda() -> None:
     cudss_url = "https://developer.download.nvidia.com/compute/cudss/0.7.1/local_installers/cudss-local-repo-ubuntu2204-0.7.1_0.7.1-1_amd64.deb"
     
     print(f"Downloading CUDS installer...")
-    run_command(["wget", cudss_url], "Failed to download CUDS installer")
+    run_command(["sudo", "wget", cudss_url], "Failed to download CUDS installer")
     
     print("Installing CUDS repository...")
     run_command(["sudo", "dpkg", "-i", cudss_deb], "Failed to install CUDS repository")
