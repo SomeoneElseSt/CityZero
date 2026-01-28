@@ -18,6 +18,50 @@ from datetime import datetime
 import multiprocessing
 
 
+def run_command(cmd: list[str], error_msg: str, cwd: Path | None = None, env: dict | None = None, 
+                capture_output: bool = True, text: bool = True, shell: bool = False,
+                continue_on_error: bool = False) -> subprocess.CompletedProcess:
+    """
+    Run a command and handle errors consistently.
+    
+    Args:
+        cmd: Command to run as a list
+        error_msg: Error message to display on failure
+        cwd: Working directory for the command
+        env: Environment variables dict
+        capture_output: Whether to capture stdout/stderr
+        text: Whether to return text output
+        shell: Whether to use shell execution
+        continue_on_error: If True, print warning instead of exiting on error
+    
+    Returns:
+        CompletedProcess result
+    """
+    kwargs = {}
+    if cwd:
+        kwargs["cwd"] = cwd
+    if env:
+        kwargs["env"] = env
+    if capture_output:
+        kwargs["capture_output"] = True
+    if text:
+        kwargs["text"] = True
+    if shell:
+        kwargs["shell"] = True
+    
+    result = subprocess.run(cmd, **kwargs)
+    
+    if result.returncode != 0:
+        prefix = "WARNING" if continue_on_error else "ERROR"
+        print(f"{prefix}: {error_msg} (exit code: {result.returncode})")
+        if capture_output and result.stderr:
+            print(result.stderr)
+        if not continue_on_error:
+            sys.exit(1)
+    
+    return result
+
+
 def install_dependencies() -> None:
     """Install required dependencies for building COLMAP."""
     packages = [
@@ -34,6 +78,7 @@ def install_dependencies() -> None:
         "libmetis-dev",
         "libgoogle-glog-dev",
         "libgflags-dev",
+        "libabsl-dev",
         "libgtest-dev",
         "libgmock-dev",
         "libsqlite3-dev",
@@ -59,10 +104,7 @@ def install_dependencies() -> None:
                DEBIAN_FRONTEND="noninteractive",
                NEEDRESTART_MODE="a",
                NEEDRESTART_SUSPEND="1")
-    update_result = subprocess.run(["sudo", "apt", "update"], env=env)
-    if update_result.returncode != 0:
-        print(f"ERROR: Failed to update apt package list (exit code: {update_result.returncode})")
-        sys.exit(1)
+    run_command(["sudo", "apt", "update"], "Failed to update apt package list", env=env, capture_output=False)
 
     print("Resolving package conflicts...")
     subprocess.run(["sudo", "apt", "remove", "-y", "ucx", "libucx0"], env=env)
@@ -70,10 +112,7 @@ def install_dependencies() -> None:
 
     print("Installing dependencies...")
     cmd = ["sudo", "apt", "install", "-y"] + packages
-    result = subprocess.run(cmd, env=env)
-    if result.returncode != 0:
-        print(f"ERROR: Failed to install dependencies (exit code: {result.returncode})")
-        sys.exit(1)
+    run_command(cmd, "Failed to install dependencies", env=env, capture_output=False)
 
     print("All dependencies installed")
 
@@ -86,50 +125,25 @@ def build_ceres_with_cuda() -> None:
     cudss_url = "https://developer.download.nvidia.com/compute/cudss/0.7.1/local_installers/cudss-local-repo-ubuntu2204-0.7.1_0.7.1-1_amd64.deb"
     
     print(f"Downloading CUDS installer...")
-    wget_result = subprocess.run(["wget", cudss_url], capture_output=True, text=True)
-    if wget_result.returncode != 0:
-        print(f"ERROR: Failed to download CUDS installer (exit code: {wget_result.returncode})")
-        if wget_result.stderr:
-            print(wget_result.stderr)
-        sys.exit(1)
+    run_command(["wget", cudss_url], "Failed to download CUDS installer")
     
     print("Installing CUDS repository...")
-    dpkg_result = subprocess.run(["sudo", "dpkg", "-i", cudss_deb], capture_output=True, text=True)
-    if dpkg_result.returncode != 0:
-        print(f"ERROR: Failed to install CUDS repository (exit code: {dpkg_result.returncode})")
-        if dpkg_result.stderr:
-            print(dpkg_result.stderr)
-        sys.exit(1)
+    run_command(["sudo", "dpkg", "-i", cudss_deb], "Failed to install CUDS repository")
     
     print("Copying CUDS keyring...")
     keyring_src = "/var/cudss-local-repo-ubuntu2204-0.7.1/cudss-*-keyring.gpg"
     keyring_dest = "/usr/share/keyrings/"
-    cp_result = subprocess.run(["sudo", "cp", keyring_src, keyring_dest], capture_output=True, text=True, shell=True)
-    if cp_result.returncode != 0:
-        print(f"ERROR: Failed to copy CUDS keyring (exit code: {cp_result.returncode})")
-        if cp_result.stderr:
-            print(cp_result.stderr)
-        sys.exit(1)
+    run_command(["sudo", "cp", keyring_src, keyring_dest], "Failed to copy CUDS keyring", shell=True)
     
     print("Updating apt package list...")
     env = dict(os.environ, 
                DEBIAN_FRONTEND="noninteractive",
                NEEDRESTART_MODE="a",
                NEEDRESTART_SUSPEND="1")
-    update_result = subprocess.run(["sudo", "apt-get", "update"], env=env, capture_output=True, text=True)
-    if update_result.returncode != 0:
-        print(f"ERROR: Failed to update apt package list (exit code: {update_result.returncode})")
-        if update_result.stderr:
-            print(update_result.stderr)
-        sys.exit(1)
+    run_command(["sudo", "apt-get", "update"], "Failed to update apt package list", env=env)
     
     print("Installing CUDS...")
-    install_result = subprocess.run(["sudo", "apt-get", "-y", "install", "cudss"], env=env, capture_output=True, text=True)
-    if install_result.returncode != 0:
-        print(f"ERROR: Failed to install CUDS (exit code: {install_result.returncode})")
-        if install_result.stderr:
-            print(install_result.stderr)
-        sys.exit(1)
+    run_command(["sudo", "apt-get", "-y", "install", "cudss"], "Failed to install CUDS", env=env)
     
     print("CUDS installed successfully")
     
@@ -140,27 +154,26 @@ def build_ceres_with_cuda() -> None:
     if not ceres_dir.exists():
         print("Cloning Ceres Solver repository...")
         cmd = ["git", "clone", "https://github.com/ceres-solver/ceres-solver", str(ceres_dir)]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"ERROR: Failed to clone Ceres Solver (exit code: {result.returncode})")
-            if result.stderr:
-                print(result.stderr)
-            sys.exit(1)
+        run_command(cmd, "Failed to clone Ceres Solver")
         print("Ceres Solver cloned")
     else:
         print(f"Ceres Solver already cloned at {ceres_dir}")
+        print("Pulling latest changes from master...")
+        run_command(["git", "pull"], "Failed to pull latest changes", cwd=ceres_dir)
     
-    print("Checking out version 2.2.0...")
-    checkout_cmd = ["git", "checkout", "2.2.0"]
-    result = subprocess.run(checkout_cmd, cwd=ceres_dir, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"ERROR: Failed to checkout version 2.2.0 (exit code: {result.returncode})")
-        if result.stderr:
-            print(result.stderr)
-        sys.exit(1)
+    print("Initializing git submodules (including bundled abseil)...")
+    run_command(["git", "submodule", "update", "--init", "--recursive"], "Failed to initialize git submodules", cwd=ceres_dir)
     
     build_dir = ceres_dir / "build"
     build_dir.mkdir(exist_ok=True)
+    
+    print("Cleaning build directory...")
+    if build_dir.exists():
+        for item in build_dir.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
     
     print("\nConfiguring Ceres Solver with CMake...")
     nvcc_path = resolve_nvcc_path()
@@ -175,17 +188,13 @@ def build_ceres_with_cuda() -> None:
         "-DUSE_CUDA=ON",
         "-DUSE_CUDSS=ON",
         "-DCMAKE_CUDA_ARCHITECTURES=80",
+        "-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/libcudss/12/cmake/cudss",
         "-DBUILD_SHARED_LIBS=ON",
         "-DBUILD_TESTING=OFF",
         "-DBUILD_EXAMPLES=OFF",
     ]
     
-    result = subprocess.run(cmake_cmd, cwd=build_dir, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"ERROR: CMake configuration failed (exit code: {result.returncode})")
-        if result.stderr:
-            print(result.stderr)
-        sys.exit(1)
+    run_command(cmake_cmd, "CMake configuration failed", cwd=build_dir)
     
     print("CMake configuration complete")
     
@@ -207,19 +216,10 @@ def build_ceres_with_cuda() -> None:
     
     print("\nInstalling Ceres Solver...")
     install_cmd = ["sudo", "ninja", "install"]
-    result = subprocess.run(install_cmd, cwd=build_dir, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"ERROR: Installation failed (exit code: {result.returncode})")
-        if result.stderr:
-            print(result.stderr)
-        sys.exit(1)
+    run_command(install_cmd, "Installation failed", cwd=build_dir)
     
     print("Registering new library...")
-    ldconfig_result = subprocess.run(["sudo", "ldconfig"], capture_output=True, text=True)
-    if ldconfig_result.returncode != 0:
-        print(f"WARNING: ldconfig failed (exit code: {ldconfig_result.returncode})")
-        if ldconfig_result.stderr:
-            print(ldconfig_result.stderr)
+    run_command(["sudo", "ldconfig"], "ldconfig failed", continue_on_error=True)
     
     print("Ceres Solver installed successfully")
 
@@ -251,12 +251,7 @@ def build_colmap_from_source() -> None:
     if not colmap_dir.exists():
         print("Cloning COLMAP repository...")
         cmd = ["git", "clone", "https://github.com/colmap/colmap.git", str(colmap_dir)]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"ERROR: Failed to clone COLMAP (exit code: {result.returncode})")
-            if result.stderr:
-                print(result.stderr)
-            sys.exit(1)
+        run_command(cmd, "Failed to clone COLMAP")
         print("COLMAP cloned")
     else:
         print(f"COLMAP already cloned at {colmap_dir}")
@@ -278,15 +273,11 @@ def build_colmap_from_source() -> None:
         "-DCMAKE_CUDA_ARCHITECTURES=80;86",
         "-DCUDA_ENABLED=ON",
         "-DCMAKE_CUDA_COMPILER=" + nvcc_path,
+        "-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/libcudss/12/cmake/cudss",
         "-DGUI_ENABLED=OFF",
     ]
 
-    result = subprocess.run(cmake_cmd, cwd=build_dir, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"ERROR: CMake configuration failed (exit code: {result.returncode})")
-        if result.stderr:
-            print(result.stderr)
-        sys.exit(1)
+    run_command(cmake_cmd, "CMake configuration failed", cwd=build_dir)
 
     print("CMake configuration complete")
 
@@ -308,12 +299,7 @@ def build_colmap_from_source() -> None:
 
     print("\nInstalling COLMAP...")
     install_cmd = ["sudo", "ninja", "install"]
-    result = subprocess.run(install_cmd, cwd=build_dir, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"ERROR: Installation failed (exit code: {result.returncode})")
-        if result.stderr:
-            print(result.stderr)
-        sys.exit(1)
+    run_command(install_cmd, "Installation failed", cwd=build_dir)
 
     print("COLMAP installed to /usr/local/bin/colmap")
 
