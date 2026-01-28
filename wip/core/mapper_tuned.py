@@ -53,10 +53,15 @@ def reconstruction(database_path, image_path, output_path, image_list_path) -> N
         "--output_path", str(output_path),
         "--Mapper.image_list_path", str(image_list_path),
         "--Mapper.ba_use_gpu", "1",
-        "--Mapper.ba_gpu_index", "-1",      # Auto-detect GPU
-        "--Mapper.num_threads", "-1",       # Auto-detect threads
-        "--Mapper.ignore_watermarks", "1",  # Ignore Watermarks
-    ]
+        "--Mapper.ba_gpu_index", "-1",                 # Auto-detect GPU
+        "--Mapper.num_threads", "-1",                  # Auto-detect threads
+        "--Mapper.ignore_watermarks", "1",             # Ignore Watermarks
+        "--Mapper.init_min_num_inliers", "200",        # Most samples have 30 > inliers. This should constraint the starting pairs better. 
+        "--Mapper.init_max_forward_motion", "0.4",     # Should be stricter about having the initial pairs be separate from each other, rather than, for example, a picture of two very-similar looking houses facing forwards (this should have it see the features are different thanks to the angular separation)
+        "--Mapper.init_num_trials", "400",             # I saw many initial matches fail a lot, and even at 200 min_inliers, there are plenty, so it's good to try lots for rebudancy 
+        "--Mapper.init_min_tri_angle", "32",           # Twice as much as the default for stricter geometry matches
+        "--Mapper.abs_pose_min_inlier_ratio", "0.40",  # Almost twice as much as the default. Should significantly cut down on false positives and matches that aren't strong.
+        "--Mapper.abs_pose_min_num_inliers", "80",     # Too many images are 30 > inliers, so this should cut down on easy matches and barely related images    ]
 
     try:
         result = subprocess.run(cmd, check=True, text=True)
