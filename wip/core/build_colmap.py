@@ -87,6 +87,7 @@ def install_dependencies() -> None:
         "libabsl-dev",
         "libgtest-dev",
         "libgmock-dev",
+        "libsuitesparse-dev",
         "libsqlite3-dev",
         "libglew-dev",
         "libcgal-dev",
