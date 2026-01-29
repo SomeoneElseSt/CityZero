@@ -21,6 +21,7 @@ ENV/
 
 # Environment variables
 .env
+wip/scripts/*.txt
 
 # Data directories
 data/neighborhoods/*
