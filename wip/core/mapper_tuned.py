@@ -15,6 +15,18 @@ Note, as of Jan 28, this is the distribution of matches:
 50-99 inliers|675462
 <15 inliers|4673433
 
+Important note: This process may hang on the first print
+
+"Starting sparse reconstruction..."
+
+For a while depending on your database size.
+
+To inspect what COLMAP is doing and whether its hung, you can run this command:
+
+sudo strace -k -p <pid>
+
+It will show both the system calls the process is doing  as well as which functions in COLMAPs code are sending them out. 
+
 """
 
 import argparse
