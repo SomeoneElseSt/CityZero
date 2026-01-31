@@ -14,12 +14,45 @@ without needing to recompute features and matches from scratch.
 import argparse
 import sqlite3
 import sys
+import numpy as np
 from pathlib import Path
 from typing import Dict, Set, Tuple, List, Any, Iterator
 
 # Constants for optimization
 BATCH_SIZE = 10000  # Number of rows to process at once
 CACHE_SIZE = -2000000  # 2GB cache (negative value = KB)
+PAIR_ID_BASE = 2147483647  # COLMAP's constant for pair_id encoding
+
+
+def pair_id_to_image_ids(pair_id: int) -> Tuple[int, int]:
+    """
+    Decode COLMAP pair_id to image IDs.
+    
+    Args:
+        pair_id: Encoded pair ID from COLMAP database
+        
+    Returns:
+        Tuple of (image_id1, image_id2) where image_id1 <= image_id2
+    """
+    image_id2 = pair_id % PAIR_ID_BASE
+    image_id1 = (pair_id - image_id2) // PAIR_ID_BASE
+    return int(image_id1), int(image_id2)
+
+
+def image_ids_to_pair_id(image_id1: int, image_id2: int) -> int:
+    """
+    Encode two image IDs into COLMAP pair_id.
+    
+    Args:
+        image_id1: First image ID
+        image_id2: Second image ID
+        
+    Returns:
+        Encoded pair_id for COLMAP database
+    """
+    if image_id1 > image_id2:
+        image_id1, image_id2 = image_id2, image_id1
+    return PAIR_ID_BASE * image_id1 + image_id2
 
 
 def load_image_list(image_list_path: str) -> Set[str]:
@@ -398,8 +431,9 @@ def filter_frame_data(source_cur: sqlite3.Cursor,
                 old_frame_id, old_data_id, sensor_id, sensor_type = row
                 new_id = image_id_map[old_frame_id]
                 new_data_id = image_id_map.get(old_data_id, new_id)
+                new_sensor_id = image_id_map.get(sensor_id, sensor_id)
                 
-                batch_data.append((new_id, new_data_id, sensor_id, sensor_type))
+                batch_data.append((new_id, new_data_id, new_sensor_id, sensor_type))
             
             if batch_data:
                 output_cur.executemany(
@@ -450,9 +484,10 @@ def filter_rigs(source_cur: sqlite3.Cursor,
             
             batch_data = []
             for row in source_cur:
-                old_rig_id = row[0]
+                old_rig_id, ref_sensor_id, ref_sensor_type = row
                 new_id = image_id_map[old_rig_id]
-                batch_data.append((new_id,) + row[1:])
+                new_ref_sensor_id = image_id_map.get(ref_sensor_id, ref_sensor_id)
+                batch_data.append((new_id, new_ref_sensor_id, ref_sensor_type))
             
             if batch_data:
                 output_cur.executemany(
@@ -517,6 +552,8 @@ def filter_matches(source_cur: sqlite3.Cursor,
                   image_id_map: Dict[int, int]) -> int:
     """
     Filter matches for specified image pairs.
+    NOTE: Matches are NOT required by COLMAP mapper - only two_view_geometries are used.
+    This function is skipped to save time and disk space.
     
     Args:
         source_cur: Source database cursor
@@ -524,64 +561,39 @@ def filter_matches(source_cur: sqlite3.Cursor,
         image_id_map: Mapping from old image_id to new image_id
     
     Returns:
-        Number of filtered match pairs
+        Number of filtered match pairs (always 0 - skipped)
     """
-    print("Filtering matches...")
+    print("Skipping matches (not needed by COLMAP mapper)...")
+    return 0
+
+
+def swap_match_columns(data_blob: bytes, num_rows: int) -> bytes:
+    """
+    Swap the two columns of a match data BLOB.
+    COLMAP stores matches as (rows x 2) uint32 matrices in row-major order.
     
-    source_cur.arraysize = BATCH_SIZE
-    try:
-        source_cur.execute("SELECT pair_id, rows, cols, data FROM matches")
-    except sqlite3.Error as e:
-        print(f"Failed to query matches: {e}")
-        sys.exit(1)
-    
-    match_count = 0
-    batch_data = []
-    
-    while True:
-        rows = source_cur.fetchmany(BATCH_SIZE)
-        if not rows:
-            break
-            
-        for row in rows:
-            pair_id = row[0]
-            image_id1 = pair_id >> 32
-            image_id2 = pair_id & 0xFFFFFFFF
-            
-            if image_id1 not in image_id_map or image_id2 not in image_id_map:
-                continue
-            
-            new_id1 = image_id_map[image_id1]
-            new_id2 = image_id_map[image_id2]
-            new_pair_id = (new_id1 << 32) | new_id2
-            
-            batch_data.append((new_pair_id,) + row[1:])
+    Args:
+        data_blob: Binary BLOB containing match data
+        num_rows: Number of rows in the matrix
         
-        if len(batch_data) >= BATCH_SIZE:
-            try:
-                output_cur.executemany(
-                    "INSERT INTO matches VALUES (?, ?, ?, ?)",
-                    batch_data
-                )
-                match_count += len(batch_data)
-                batch_data = []
-            except sqlite3.Error as e:
-                print(f"Failed to insert matches batch: {e}")
-                sys.exit(1)
-                
-    if batch_data:
-        try:
-            output_cur.executemany(
-                "INSERT INTO matches VALUES (?, ?, ?, ?)",
-                batch_data
-            )
-            match_count += len(batch_data)
-        except sqlite3.Error as e:
-            print(f"Failed to insert remaining matches: {e}")
-            sys.exit(1)
+    Returns:
+        New BLOB with columns swapped
+    """
+    if not data_blob or num_rows == 0:
+        return data_blob
+        
+    # Decode as uint32 array
+    arr = np.frombuffer(data_blob, dtype=np.uint32).copy()
     
-    print(f"Filtered to {match_count} match pairs")
-    return match_count
+    if len(arr) != num_rows * 2:
+        return data_blob
+        
+    # Reshape to (rows, 2) and swap columns
+    arr = arr.reshape(num_rows, 2)
+    arr = arr[:, [1, 0]]  # Swap columns
+    
+    # Return as bytes
+    return arr.tobytes()
 
 
 def filter_two_view_geometries(source_cur: sqlite3.Cursor,
@@ -589,6 +601,7 @@ def filter_two_view_geometries(source_cur: sqlite3.Cursor,
                               image_id_map: Dict[int, int]) -> int:
     """
     Filter two_view_geometries for specified image pairs.
+    Handles canonical pair ordering and swaps inlier match columns when needed.
     
     Args:
         source_cur: Source database cursor
@@ -617,17 +630,37 @@ def filter_two_view_geometries(source_cur: sqlite3.Cursor,
             
         for row in rows:
             pair_id = row[0]
-            image_id1 = pair_id >> 32
-            image_id2 = pair_id & 0xFFFFFFFF
+            image_id1, image_id2 = pair_id_to_image_ids(pair_id)
             
             if image_id1 not in image_id_map or image_id2 not in image_id_map:
                 continue
             
             new_id1 = image_id_map[image_id1]
             new_id2 = image_id_map[image_id2]
-            new_pair_id = (new_id1 << 32) | new_id2
             
-            batch_data.append((new_pair_id,) + row[1:])
+            # Check if we need to swap to maintain canonical ordering
+            need_swap = new_id1 > new_id2
+            if need_swap:
+                new_id1, new_id2 = new_id2, new_id1
+            
+            new_pair_id = image_ids_to_pair_id(new_id1, new_id2)
+            
+            # two_view_geometries row structure:
+            # (pair_id, rows, cols, data, config, F, E, H, qvec, tvec)
+            # indices: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+            
+            if need_swap:
+                # Swap the inlier match columns in the data BLOB
+                num_rows = row[1]  # rows field
+                data_blob = row[3]  # data field
+                swapped_data = swap_match_columns(data_blob, num_rows)
+                
+                # Reconstruct row with swapped data
+                new_row = (new_pair_id, row[1], row[2], swapped_data) + row[4:]
+            else:
+                new_row = (new_pair_id,) + row[1:]
+            
+            batch_data.append(new_row)
         
         if len(batch_data) >= BATCH_SIZE:
             try:
@@ -661,6 +694,7 @@ def filter_pose_priors(source_cur: sqlite3.Cursor,
                       image_id_map: Dict[int, int]) -> int:
     """
     Filter pose_priors for specified images.
+    Keeps original pose_prior_id (primary key) and only remaps corr_data_id.
     
     Args:
         source_cur: Source database cursor
@@ -697,23 +731,26 @@ def filter_pose_priors(source_cur: sqlite3.Cursor,
         print(f"Warning: Failed to query pose_priors: {e}")
         return 0
     
+    source_cur.arraysize = BATCH_SIZE
     prior_count = 0
-    new_prior_id = 1
     batch_data = []
     
-    rows = source_cur.fetchall()
-    
-    for row in rows:
-        pose_prior_id, corr_data_id = row[0], row[1]
-        
-        if corr_data_id not in image_id_map:
-            continue
-        
-        new_data_id = image_id_map[corr_data_id]
-        
-        batch_data.append((new_prior_id, new_data_id) + row[2:])
-        new_prior_id += 1
-        prior_count += 1
+    while True:
+        rows = source_cur.fetchmany(BATCH_SIZE)
+        if not rows:
+            break
+            
+        for row in rows:
+            pose_prior_id, corr_data_id = row[0], row[1]
+            
+            if corr_data_id not in image_id_map:
+                continue
+            
+            new_data_id = image_id_map[corr_data_id]
+            
+            # Keep original pose_prior_id, only remap corr_data_id
+            batch_data.append((pose_prior_id, new_data_id) + row[2:])
+            prior_count += 1
         
         if len(batch_data) >= BATCH_SIZE:
             try:
