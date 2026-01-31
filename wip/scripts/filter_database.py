@@ -14,7 +14,6 @@ without needing to recompute features and matches from scratch.
 import argparse
 import sqlite3
 import sys
-import numpy as np
 from pathlib import Path
 from typing import Dict, Set, Tuple, List, Any, Iterator
 
@@ -154,14 +153,13 @@ def filter_images(source_cur: sqlite3.Cursor,
     print("Filtering images...")
     
     try:
-        source_cur.execute("SELECT image_id, name, camera_id FROM images")
+        source_cur.execute("SELECT image_id, name, camera_id FROM images ORDER BY image_id")
     except sqlite3.Error as e:
         print(f"Failed to query images table: {e}")
         sys.exit(1)
     
     image_id_map = {}
     camera_ids = set()
-    new_image_id = 1
     batch_data = []
     
     for row in source_cur:
@@ -171,10 +169,9 @@ def filter_images(source_cur: sqlite3.Cursor,
             continue
         
         camera_ids.add(camera_id)
-        image_id_map[image_id] = new_image_id
+        image_id_map[image_id] = image_id
         
-        batch_data.append((new_image_id, name, camera_id))
-        new_image_id += 1
+        batch_data.append((image_id, name, camera_id))
         
         if len(batch_data) >= BATCH_SIZE:
             try:
@@ -567,41 +564,11 @@ def filter_matches(source_cur: sqlite3.Cursor,
     return 0
 
 
-def swap_match_columns(data_blob: bytes, num_rows: int) -> bytes:
-    """
-    Swap the two columns of a match data BLOB.
-    COLMAP stores matches as (rows x 2) uint32 matrices in row-major order.
-    
-    Args:
-        data_blob: Binary BLOB containing match data
-        num_rows: Number of rows in the matrix
-        
-    Returns:
-        New BLOB with columns swapped
-    """
-    if not data_blob or num_rows == 0:
-        return data_blob
-        
-    # Decode as uint32 array
-    arr = np.frombuffer(data_blob, dtype=np.uint32).copy()
-    
-    if len(arr) != num_rows * 2:
-        return data_blob
-        
-    # Reshape to (rows, 2) and swap columns
-    arr = arr.reshape(num_rows, 2)
-    arr = arr[:, [1, 0]]  # Swap columns
-    
-    # Return as bytes
-    return arr.tobytes()
-
-
 def filter_two_view_geometries(source_cur: sqlite3.Cursor,
                               output_cur: sqlite3.Cursor,
                               image_id_map: Dict[int, int]) -> int:
     """
     Filter two_view_geometries for specified image pairs.
-    Handles canonical pair ordering and swaps inlier match columns when needed.
     
     Args:
         source_cur: Source database cursor
@@ -635,32 +602,7 @@ def filter_two_view_geometries(source_cur: sqlite3.Cursor,
             if image_id1 not in image_id_map or image_id2 not in image_id_map:
                 continue
             
-            new_id1 = image_id_map[image_id1]
-            new_id2 = image_id_map[image_id2]
-            
-            # Check if we need to swap to maintain canonical ordering
-            need_swap = new_id1 > new_id2
-            if need_swap:
-                new_id1, new_id2 = new_id2, new_id1
-            
-            new_pair_id = image_ids_to_pair_id(new_id1, new_id2)
-            
-            # two_view_geometries row structure:
-            # (pair_id, rows, cols, data, config, F, E, H, qvec, tvec)
-            # indices: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-            
-            if need_swap:
-                # Swap the inlier match columns in the data BLOB
-                num_rows = row[1]  # rows field
-                data_blob = row[3]  # data field
-                swapped_data = swap_match_columns(data_blob, num_rows)
-                
-                # Reconstruct row with swapped data
-                new_row = (new_pair_id, row[1], row[2], swapped_data) + row[4:]
-            else:
-                new_row = (new_pair_id,) + row[1:]
-            
-            batch_data.append(new_row)
+            batch_data.append((pair_id,) + row[1:])
         
         if len(batch_data) >= BATCH_SIZE:
             try:
