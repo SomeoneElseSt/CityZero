@@ -448,6 +448,7 @@ def filter_rigs(source_cur: sqlite3.Cursor,
                image_id_map: Dict[int, int]) -> None:
     """
     Filter rigs (rig_id corresponds to image_id).
+    ref_sensor_id should point to the camera used by this rig's image.
     
     Args:
         source_cur: Source database cursor
@@ -468,31 +469,40 @@ def filter_rigs(source_cur: sqlite3.Cursor,
         print(f"Warning: Could not check rigs table: {e}")
         return
     
-    old_ids = list(image_id_map.keys())
-    
-    for chunk_old_ids in chunk_list(old_ids, 900):
-        placeholders = ','.join('?' * len(chunk_old_ids))
-        
+    for old_id, new_id in image_id_map.items():
         try:
             source_cur.execute(
-                f"SELECT rig_id, ref_sensor_id, ref_sensor_type FROM rigs WHERE rig_id IN ({placeholders})",
-                chunk_old_ids
+                "SELECT ref_sensor_type FROM rigs WHERE rig_id = ?",
+                (old_id,)
             )
-            
-            batch_data = []
-            for row in source_cur:
-                old_rig_id, ref_sensor_id, ref_sensor_type = row
-                new_id = image_id_map[old_rig_id]
-                new_ref_sensor_id = image_id_map.get(ref_sensor_id, ref_sensor_id)
-                batch_data.append((new_id, new_ref_sensor_id, ref_sensor_type))
-            
-            if batch_data:
-                output_cur.executemany(
-                    "INSERT INTO rigs VALUES (?, ?, ?)",
-                    batch_data
-                )
+            row = source_cur.fetchone()
+            if not row:
+                continue
+            ref_sensor_type = row[0]
         except sqlite3.Error as e:
-            print(f"Failed to filter rigs batch: {e}")
+            print(f"Failed to query rigs for image {old_id}: {e}")
+            sys.exit(1)
+
+        try:
+            output_cur.execute(
+                "SELECT camera_id FROM images WHERE image_id = ?",
+                (new_id,)
+            )
+            camera_row = output_cur.fetchone()
+            if not camera_row:
+                continue
+            correct_camera_id = camera_row[0]
+        except sqlite3.Error as e:
+            print(f"Failed to get camera for image {new_id}: {e}")
+            sys.exit(1)
+
+        try:
+            output_cur.execute(
+                "INSERT INTO rigs VALUES (?, ?, ?)",
+                (new_id, correct_camera_id, ref_sensor_type)
+            )
+        except sqlite3.Error as e:
+            print(f"Failed to insert rig for image {new_id}: {e}")
             sys.exit(1)
 
 
