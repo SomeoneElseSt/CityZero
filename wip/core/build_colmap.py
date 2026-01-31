@@ -104,6 +104,9 @@ def install_dependencies() -> None:
         "libqt6openglwidgets6",
         "nvidia-cuda-toolkit",
         "nvidia-cuda-toolkit-gcc",
+        # Non-COLMAP but useful libraries
+        "micro",
+        "sqlite3",
     ]
 
     print("Updating apt package list...")
