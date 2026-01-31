@@ -15,7 +15,11 @@ import argparse
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Dict, Set, Tuple
+from typing import Dict, Set, Tuple, List, Any, Iterator
+
+# Constants for optimization
+BATCH_SIZE = 10000  # Number of rows to process at once
+CACHE_SIZE = -2000000  # 2GB cache (negative value = KB)
 
 
 def load_image_list(image_list_path: str) -> Set[str]:
@@ -39,30 +43,63 @@ def load_image_list(image_list_path: str) -> Set[str]:
     return image_names
 
 
-def copy_database_schema(source_cur: sqlite3.Cursor, output_cur: sqlite3.Cursor) -> None:
+def create_tables_and_get_indices(source_cur: sqlite3.Cursor, output_cur: sqlite3.Cursor) -> List[str]:
     """
-    Copy database schema from source to output database.
+    Copy database schema (tables only) from source to output database.
+    Returns list of index creation SQL statements to be executed later.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
+        
+    Returns:
+        List of SQL statements to create indices
     """
-    print("Copying database schema...")
+    print("Copying database schema (tables only)...")
+    indices = []
     
     try:
         schema = source_cur.execute(
-            "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
+            "SELECT sql, type FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
         ).fetchall()
     except sqlite3.Error as e:
         print(f"Failed to read database schema: {e}")
         sys.exit(1)
     
-    for sql, in schema:
+    for sql, type_ in schema:
+        if type_ == 'index':
+            indices.append(sql)
+            continue
+            
         try:
             output_cur.execute(sql)
         except sqlite3.Error as e:
             print(f"Failed to create table: {e}")
             sys.exit(1)
+            
+    return indices
+
+
+def create_indices(output_cur: sqlite3.Cursor, indices: List[str]) -> None:
+    """
+    Create indices after bulk insertion.
+    
+    Args:
+        output_cur: Output database cursor
+        indices: List of SQL statements to create indices
+    """
+    print(f"Creating {len(indices)} indices...")
+    for sql in indices:
+        try:
+            output_cur.execute(sql)
+        except sqlite3.Error as e:
+            print(f"Warning: Failed to create index: {e}")
+
+
+def chunk_list(lst: List[Any], chunk_size: int) -> Iterator[List[Any]]:
+    """Yield successive chunks from lst."""
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
 
 
 def filter_images(source_cur: sqlite3.Cursor, 
@@ -92,6 +129,7 @@ def filter_images(source_cur: sqlite3.Cursor,
     image_id_map = {}
     camera_ids = set()
     new_image_id = 1
+    batch_data = []
     
     for row in source_cur:
         image_id, name, camera_id = row
@@ -102,16 +140,29 @@ def filter_images(source_cur: sqlite3.Cursor,
         camera_ids.add(camera_id)
         image_id_map[image_id] = new_image_id
         
+        batch_data.append((new_image_id, name, camera_id))
+        new_image_id += 1
+        
+        if len(batch_data) >= BATCH_SIZE:
+            try:
+                output_cur.executemany(
+                    "INSERT INTO images VALUES (?, ?, ?)",
+                    batch_data
+                )
+                batch_data = []
+            except sqlite3.Error as e:
+                print(f"Failed to insert images batch: {e}")
+                sys.exit(1)
+                
+    if batch_data:
         try:
-            output_cur.execute(
+            output_cur.executemany(
                 "INSERT INTO images VALUES (?, ?, ?)",
-                (new_image_id, name, camera_id)
+                batch_data
             )
         except sqlite3.Error as e:
-            print(f"Failed to insert image {name}: {e}")
+            print(f"Failed to insert remaining images: {e}")
             sys.exit(1)
-        
-        new_image_id += 1
     
     print(f"Filtered to {len(image_id_map)} images using {len(camera_ids)} cameras")
     return image_id_map, camera_ids
@@ -133,22 +184,24 @@ def copy_cameras(source_cur: sqlite3.Cursor,
     if not camera_ids:
         return
     
-    placeholders = ','.join('?' * len(camera_ids))
+    camera_id_list = list(camera_ids)
     
-    try:
-        source_cur.execute(
-            f"SELECT * FROM cameras WHERE camera_id IN ({placeholders})",
-            list(camera_ids)
-        )
-    except sqlite3.Error as e:
-        print(f"Failed to query cameras: {e}")
-        sys.exit(1)
-    
-    for row in source_cur:
+    for chunk in chunk_list(camera_id_list, BATCH_SIZE // 10):  # Smaller batch for IN clause
+        placeholders = ','.join('?' * len(chunk))
         try:
-            output_cur.execute("INSERT INTO cameras VALUES (?, ?, ?, ?, ?, ?)", row)
+            source_cur.execute(
+                f"SELECT * FROM cameras WHERE camera_id IN ({placeholders})",
+                chunk
+            )
+            rows = source_cur.fetchall()
+            
+            if rows:
+                output_cur.executemany(
+                    "INSERT INTO cameras VALUES (?, ?, ?, ?, ?, ?)", 
+                    rows
+                )
         except sqlite3.Error as e:
-            print(f"Failed to insert camera: {e}")
+            print(f"Failed to copy cameras batch: {e}")
             sys.exit(1)
 
 
@@ -165,27 +218,35 @@ def filter_keypoints(source_cur: sqlite3.Cursor,
     """
     print("Filtering keypoints...")
     
-    for old_id, new_id in image_id_map.items():
+    # Increase fetch size for BLOBs
+    source_cur.arraysize = BATCH_SIZE
+    
+    old_ids = list(image_id_map.keys())
+    
+    # Process in chunks to avoid large IN clauses
+    for chunk_old_ids in chunk_list(old_ids, 900):  # SQLite limit is often 999 vars
+        placeholders = ','.join('?' * len(chunk_old_ids))
+        
         try:
             source_cur.execute(
-                "SELECT rows, cols, data FROM keypoints WHERE image_id = ?",
-                (old_id,)
+                f"SELECT image_id, rows, cols, data FROM keypoints WHERE image_id IN ({placeholders})",
+                chunk_old_ids
             )
-            row = source_cur.fetchone()
+            
+            batch_data = []
+            for row in source_cur:
+                old_id = row[0]
+                new_id = image_id_map[old_id]
+                batch_data.append((new_id,) + row[1:])
+            
+            if batch_data:
+                output_cur.executemany(
+                    "INSERT INTO keypoints VALUES (?, ?, ?, ?)",
+                    batch_data
+                )
+                
         except sqlite3.Error as e:
-            print(f"Failed to query keypoints for image {old_id}: {e}")
-            sys.exit(1)
-        
-        if not row:
-            continue
-        
-        try:
-            output_cur.execute(
-                "INSERT INTO keypoints VALUES (?, ?, ?, ?)",
-                (new_id,) + row
-            )
-        except sqlite3.Error as e:
-            print(f"Failed to insert keypoints for image {new_id}: {e}")
+            print(f"Failed to filter keypoints batch: {e}")
             sys.exit(1)
 
 
@@ -202,27 +263,32 @@ def filter_descriptors(source_cur: sqlite3.Cursor,
     """
     print("Filtering descriptors...")
     
-    for old_id, new_id in image_id_map.items():
+    source_cur.arraysize = BATCH_SIZE
+    old_ids = list(image_id_map.keys())
+    
+    for chunk_old_ids in chunk_list(old_ids, 900):
+        placeholders = ','.join('?' * len(chunk_old_ids))
+        
         try:
             source_cur.execute(
-                "SELECT rows, cols, data FROM descriptors WHERE image_id = ?",
-                (old_id,)
+                f"SELECT image_id, rows, cols, data FROM descriptors WHERE image_id IN ({placeholders})",
+                chunk_old_ids
             )
-            row = source_cur.fetchone()
+            
+            batch_data = []
+            for row in source_cur:
+                old_id = row[0]
+                new_id = image_id_map[old_id]
+                batch_data.append((new_id,) + row[1:])
+                
+            if batch_data:
+                output_cur.executemany(
+                    "INSERT INTO descriptors VALUES (?, ?, ?, ?)",
+                    batch_data
+                )
+                
         except sqlite3.Error as e:
-            print(f"Failed to query descriptors for image {old_id}: {e}")
-            sys.exit(1)
-        
-        if not row:
-            continue
-        
-        try:
-            output_cur.execute(
-                "INSERT INTO descriptors VALUES (?, ?, ?, ?)",
-                (new_id,) + row
-            )
-        except sqlite3.Error as e:
-            print(f"Failed to insert descriptors for image {new_id}: {e}")
+            print(f"Failed to filter descriptors batch: {e}")
             sys.exit(1)
 
 
@@ -239,30 +305,37 @@ def filter_frames(source_cur: sqlite3.Cursor,
     """
     print("Filtering frames...")
     
-    for old_id, new_id in image_id_map.items():
+    old_ids = list(image_id_map.keys())
+    
+    for chunk_old_ids in chunk_list(old_ids, 900):
+        placeholders = ','.join('?' * len(chunk_old_ids))
+        
         try:
             source_cur.execute(
-                "SELECT rig_id FROM frames WHERE frame_id = ?",
-                (old_id,)
+                f"SELECT frame_id, rig_id FROM frames WHERE frame_id IN ({placeholders})",
+                chunk_old_ids
             )
-            row = source_cur.fetchone()
+            
+            batch_data = []
+            for row in source_cur:
+                old_frame_id, old_rig_id = row
+                new_id = image_id_map[old_frame_id]
+                new_rig_id = image_id_map.get(old_rig_id, new_id) # Logic from original code? 
+                # Original logic: new_rig_id = image_id_map.get(old_rig_id, new_id)
+                # Wait, rig_id might not be in image_id_map if it's not an image ID?
+                # In COLMAP, rig_id usually maps to image_id if derived from images?
+                # Let's keep original logic.
+                
+                batch_data.append((new_id, new_rig_id))
+            
+            if batch_data:
+                output_cur.executemany(
+                    "INSERT INTO frames VALUES (?, ?)",
+                    batch_data
+                )
+                
         except sqlite3.Error as e:
-            print(f"Failed to query frames for image {old_id}: {e}")
-            sys.exit(1)
-        
-        if not row:
-            continue
-        
-        old_rig_id = row[0]
-        new_rig_id = image_id_map.get(old_rig_id, new_id)
-        
-        try:
-            output_cur.execute(
-                "INSERT INTO frames VALUES (?, ?)",
-                (new_id, new_rig_id)
-            )
-        except sqlite3.Error as e:
-            print(f"Failed to insert frame for image {new_id}: {e}")
+            print(f"Failed to filter frames batch: {e}")
             sys.exit(1)
 
 
@@ -279,30 +352,33 @@ def filter_frame_data(source_cur: sqlite3.Cursor,
     """
     print("Filtering frame_data...")
     
-    for old_id, new_id in image_id_map.items():
+    old_ids = list(image_id_map.keys())
+    
+    for chunk_old_ids in chunk_list(old_ids, 900):
+        placeholders = ','.join('?' * len(chunk_old_ids))
+        
         try:
             source_cur.execute(
-                "SELECT data_id, sensor_id, sensor_type FROM frame_data WHERE frame_id = ?",
-                (old_id,)
+                f"SELECT frame_id, data_id, sensor_id, sensor_type FROM frame_data WHERE frame_id IN ({placeholders})",
+                chunk_old_ids
             )
-            row = source_cur.fetchone()
+            
+            batch_data = []
+            for row in source_cur:
+                old_frame_id, old_data_id, sensor_id, sensor_type = row
+                new_id = image_id_map[old_frame_id]
+                new_data_id = image_id_map.get(old_data_id, new_id)
+                
+                batch_data.append((new_id, new_data_id, sensor_id, sensor_type))
+            
+            if batch_data:
+                output_cur.executemany(
+                    "INSERT INTO frame_data VALUES (?, ?, ?, ?)",
+                    batch_data
+                )
+                
         except sqlite3.Error as e:
-            print(f"Failed to query frame_data for image {old_id}: {e}")
-            sys.exit(1)
-        
-        if not row:
-            continue
-        
-        old_data_id, sensor_id, sensor_type = row
-        new_data_id = image_id_map.get(old_data_id, new_id)
-        
-        try:
-            output_cur.execute(
-                "INSERT INTO frame_data VALUES (?, ?, ?, ?)",
-                (new_id, new_data_id, sensor_id, sensor_type)
-            )
-        except sqlite3.Error as e:
-            print(f"Failed to insert frame_data for image {new_id}: {e}")
+            print(f"Failed to filter frame_data batch: {e}")
             sys.exit(1)
 
 
@@ -319,27 +395,30 @@ def filter_rigs(source_cur: sqlite3.Cursor,
     """
     print("Filtering rigs...")
     
-    for old_id, new_id in image_id_map.items():
+    old_ids = list(image_id_map.keys())
+    
+    for chunk_old_ids in chunk_list(old_ids, 900):
+        placeholders = ','.join('?' * len(chunk_old_ids))
+        
         try:
             source_cur.execute(
-                "SELECT ref_sensor_id, ref_sensor_type FROM rigs WHERE rig_id = ?",
-                (old_id,)
+                f"SELECT rig_id, ref_sensor_id, ref_sensor_type FROM rigs WHERE rig_id IN ({placeholders})",
+                chunk_old_ids
             )
-            row = source_cur.fetchone()
+            
+            batch_data = []
+            for row in source_cur:
+                old_rig_id = row[0]
+                new_id = image_id_map[old_rig_id]
+                batch_data.append((new_id,) + row[1:])
+            
+            if batch_data:
+                output_cur.executemany(
+                    "INSERT INTO rigs VALUES (?, ?, ?)",
+                    batch_data
+                )
         except sqlite3.Error as e:
-            print(f"Failed to query rigs for image {old_id}: {e}")
-            sys.exit(1)
-        
-        if not row:
-            continue
-        
-        try:
-            output_cur.execute(
-                "INSERT INTO rigs VALUES (?, ?, ?)",
-                (new_id,) + row
-            )
-        except sqlite3.Error as e:
-            print(f"Failed to insert rig for image {new_id}: {e}")
+            print(f"Failed to filter rigs batch: {e}")
             sys.exit(1)
 
 
@@ -357,35 +436,38 @@ def copy_rig_sensors(source_cur: sqlite3.Cursor,
     print("Copying rig_sensors...")
     
     try:
-        rig_sensor_count = source_cur.execute(
-            "SELECT COUNT(*) FROM rig_sensors"
-        ).fetchone()[0]
-    except sqlite3.Error as e:
-        print(f"Failed to count rig_sensors: {e}")
-        sys.exit(1)
-    
-    if rig_sensor_count == 0:
+        # Check if table has data first to avoid unnecessary work
+        count = source_cur.execute("SELECT COUNT(*) FROM rig_sensors").fetchone()[0]
+        if count == 0:
+            return
+    except sqlite3.Error:
         return
+        
+    old_ids = list(image_id_map.keys())
     
-    for old_id, new_id in image_id_map.items():
+    for chunk_old_ids in chunk_list(old_ids, 900):
+        placeholders = ','.join('?' * len(chunk_old_ids))
+        
         try:
             source_cur.execute(
-                "SELECT sensor_id, sensor_type, sensor_from_rig FROM rig_sensors WHERE rig_id = ?",
-                (old_id,)
+                f"SELECT rig_id, sensor_id, sensor_type, sensor_from_rig FROM rig_sensors WHERE rig_id IN ({placeholders})",
+                chunk_old_ids
             )
-        except sqlite3.Error as e:
-            print(f"Failed to query rig_sensors for image {old_id}: {e}")
-            sys.exit(1)
-        
-        for row in source_cur:
-            try:
-                output_cur.execute(
+            
+            batch_data = []
+            for row in source_cur:
+                old_rig_id = row[0]
+                new_id = image_id_map[old_rig_id]
+                batch_data.append((new_id,) + row[1:])
+            
+            if batch_data:
+                output_cur.executemany(
                     "INSERT INTO rig_sensors VALUES (?, ?, ?, ?)",
-                    (new_id,) + row
+                    batch_data
                 )
-            except sqlite3.Error as e:
-                print(f"Failed to insert rig_sensor for image {new_id}: {e}")
-                sys.exit(1)
+        except sqlite3.Error as e:
+            print(f"Failed to copy rig_sensors batch: {e}")
+            sys.exit(1)
 
 
 def filter_matches(source_cur: sqlite3.Cursor,
@@ -404,6 +486,7 @@ def filter_matches(source_cur: sqlite3.Cursor,
     """
     print("Filtering matches...")
     
+    source_cur.arraysize = BATCH_SIZE
     try:
         source_cur.execute("SELECT pair_id, rows, cols, data FROM matches")
     except sqlite3.Error as e:
@@ -411,29 +494,48 @@ def filter_matches(source_cur: sqlite3.Cursor,
         sys.exit(1)
     
     match_count = 0
+    batch_data = []
     
-    for row in source_cur:
-        pair_id = row[0]
-        image_id1 = pair_id >> 32
-        image_id2 = pair_id & 0xFFFFFFFF
+    while True:
+        rows = source_cur.fetchmany(BATCH_SIZE)
+        if not rows:
+            break
+            
+        for row in rows:
+            pair_id = row[0]
+            image_id1 = pair_id >> 32
+            image_id2 = pair_id & 0xFFFFFFFF
+            
+            if image_id1 not in image_id_map or image_id2 not in image_id_map:
+                continue
+            
+            new_id1 = image_id_map[image_id1]
+            new_id2 = image_id_map[image_id2]
+            new_pair_id = (new_id1 << 32) | new_id2
+            
+            batch_data.append((new_pair_id,) + row[1:])
         
-        if image_id1 not in image_id_map:
-            continue
-        if image_id2 not in image_id_map:
-            continue
-        
-        new_id1 = image_id_map[image_id1]
-        new_id2 = image_id_map[image_id2]
-        new_pair_id = (new_id1 << 32) | new_id2
-        
+        if len(batch_data) >= BATCH_SIZE:
+            try:
+                output_cur.executemany(
+                    "INSERT INTO matches VALUES (?, ?, ?, ?)",
+                    batch_data
+                )
+                match_count += len(batch_data)
+                batch_data = []
+            except sqlite3.Error as e:
+                print(f"Failed to insert matches batch: {e}")
+                sys.exit(1)
+                
+    if batch_data:
         try:
-            output_cur.execute(
+            output_cur.executemany(
                 "INSERT INTO matches VALUES (?, ?, ?, ?)",
-                (new_pair_id,) + row[1:]
+                batch_data
             )
-            match_count += 1
+            match_count += len(batch_data)
         except sqlite3.Error as e:
-            print(f"Failed to insert match for pair {new_id1}-{new_id2}: {e}")
+            print(f"Failed to insert remaining matches: {e}")
             sys.exit(1)
     
     print(f"Filtered to {match_count} match pairs")
@@ -456,6 +558,7 @@ def filter_two_view_geometries(source_cur: sqlite3.Cursor,
     """
     print("Filtering two_view_geometries...")
     
+    source_cur.arraysize = BATCH_SIZE
     try:
         source_cur.execute("SELECT * FROM two_view_geometries")
     except sqlite3.Error as e:
@@ -463,29 +566,48 @@ def filter_two_view_geometries(source_cur: sqlite3.Cursor,
         sys.exit(1)
     
     geom_count = 0
+    batch_data = []
     
-    for row in source_cur:
-        pair_id = row[0]
-        image_id1 = pair_id >> 32
-        image_id2 = pair_id & 0xFFFFFFFF
+    while True:
+        rows = source_cur.fetchmany(BATCH_SIZE)
+        if not rows:
+            break
+            
+        for row in rows:
+            pair_id = row[0]
+            image_id1 = pair_id >> 32
+            image_id2 = pair_id & 0xFFFFFFFF
+            
+            if image_id1 not in image_id_map or image_id2 not in image_id_map:
+                continue
+            
+            new_id1 = image_id_map[image_id1]
+            new_id2 = image_id_map[image_id2]
+            new_pair_id = (new_id1 << 32) | new_id2
+            
+            batch_data.append((new_pair_id,) + row[1:])
         
-        if image_id1 not in image_id_map:
-            continue
-        if image_id2 not in image_id_map:
-            continue
-        
-        new_id1 = image_id_map[image_id1]
-        new_id2 = image_id_map[image_id2]
-        new_pair_id = (new_id1 << 32) | new_id2
-        
+        if len(batch_data) >= BATCH_SIZE:
+            try:
+                output_cur.executemany(
+                    "INSERT INTO two_view_geometries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    batch_data
+                )
+                geom_count += len(batch_data)
+                batch_data = []
+            except sqlite3.Error as e:
+                print(f"Failed to insert geometries batch: {e}")
+                sys.exit(1)
+                
+    if batch_data:
         try:
-            output_cur.execute(
+            output_cur.executemany(
                 "INSERT INTO two_view_geometries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (new_pair_id,) + row[1:]
+                batch_data
             )
-            geom_count += 1
+            geom_count += len(batch_data)
         except sqlite3.Error as e:
-            print(f"Failed to insert geometry for pair {new_id1}-{new_id2}: {e}")
+            print(f"Failed to insert remaining geometries: {e}")
             sys.exit(1)
     
     print(f"Filtered to {geom_count} two_view_geometries")
@@ -512,12 +634,17 @@ def filter_pose_priors(source_cur: sqlite3.Cursor,
         source_cur.execute("SELECT * FROM pose_priors")
     except sqlite3.Error as e:
         print(f"Failed to query pose_priors: {e}")
-        sys.exit(1)
+        # Not all databases have pose_priors
+        return 0
     
     prior_count = 0
     new_prior_id = 1
+    batch_data = []
     
-    for row in source_cur:
+    # Pre-fetch usually small enough
+    rows = source_cur.fetchall()
+    
+    for row in rows:
         pose_prior_id, corr_data_id = row[0], row[1]
         
         if corr_data_id not in image_id_map:
@@ -525,16 +652,22 @@ def filter_pose_priors(source_cur: sqlite3.Cursor,
         
         new_data_id = image_id_map[corr_data_id]
         
-        try:
-            output_cur.execute(
+        batch_data.append((new_prior_id, new_data_id) + row[2:])
+        new_prior_id += 1
+        prior_count += 1
+        
+        if len(batch_data) >= BATCH_SIZE:
+            output_cur.executemany(
                 "INSERT INTO pose_priors VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (new_prior_id, new_data_id) + row[2:]
+                batch_data
             )
-            new_prior_id += 1
-            prior_count += 1
-        except sqlite3.Error as e:
-            print(f"Failed to insert pose_prior: {e}")
-            sys.exit(1)
+            batch_data = []
+            
+    if batch_data:
+        output_cur.executemany(
+            "INSERT INTO pose_priors VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            batch_data
+        )
     
     print(f"Filtered to {prior_count} pose_priors")
     return prior_count
@@ -599,6 +732,12 @@ def filter_database(source_db_path: str,
 
     try:
         output_conn = sqlite3.connect(output_db_path)
+        # Performance pragmas
+        output_conn.execute("PRAGMA synchronous = OFF")
+        output_conn.execute("PRAGMA journal_mode = OFF")
+        output_conn.execute(f"PRAGMA cache_size = {CACHE_SIZE}")
+        output_conn.execute("PRAGMA temp_store = MEMORY")
+        output_conn.execute("PRAGMA locking_mode = EXCLUSIVE")
     except sqlite3.Error as e: 
         print(f"Failed to connect to output database: {e}")
         sys.exit(1)        
@@ -607,7 +746,10 @@ def filter_database(source_db_path: str,
     output_cur = output_conn.cursor()
     
     try:
-        copy_database_schema(source_cur, output_cur)
+        # Start transaction explicitly
+        output_cur.execute("BEGIN TRANSACTION")
+        
+        indices = create_tables_and_get_indices(source_cur, output_cur)
         
         image_id_map, camera_ids = filter_images(source_cur, output_cur, image_names)
         
@@ -627,6 +769,9 @@ def filter_database(source_db_path: str,
         geom_count = filter_two_view_geometries(source_cur, output_cur, image_id_map)
         prior_count = filter_pose_priors(source_cur, output_cur, image_id_map)
         
+        # Create indices at the end
+        create_indices(output_cur, indices)
+        
         output_conn.commit()
         
         print(f"\nSuccessfully created filtered database: {output_db_path}")
@@ -634,6 +779,7 @@ def filter_database(source_db_path: str,
         
     except Exception as e:
         print(f"Unexpected error during filtering: {e}")
+        output_conn.rollback()
         sys.exit(1)
     finally:
         source_conn.close()
