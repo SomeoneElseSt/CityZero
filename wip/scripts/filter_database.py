@@ -581,14 +581,27 @@ def filter_database(source_db_path: str,
         print("Please remove it first or choose a different path")
         sys.exit(1)
     
-    image_names = load_image_list(image_list_path)
+    output_parent = output_path.parent
+    if not output_parent.exists():
+        try:
+            output_parent.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            print(f"Failed to create output directory: {e}")
+            sys.exit(1)
     
-    try:
+    image_names = load_image_list(image_list_path)
+
+    try: 
         source_conn = sqlite3.connect(source_db_path)
-        output_conn = sqlite3.connect(output_db_path)
     except sqlite3.Error as e:
-        print(f"Failed to connect to database: {e}")
+        print(f"Failed to connect to source database: {e}")
         sys.exit(1)
+
+    try:
+        output_conn = sqlite3.connect(output_db_path)
+    except sqlite3.Error as e: 
+        print(f"Failed to connect to output database: {e}")
+        sys.exit(1)        
     
     source_cur = source_conn.cursor()
     output_cur = output_conn.cursor()
