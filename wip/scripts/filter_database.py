@@ -184,20 +184,29 @@ def copy_cameras(source_cur: sqlite3.Cursor,
     if not camera_ids:
         return
     
+    # Get column count from schema
+    try:
+        col_info = source_cur.execute("PRAGMA table_info(cameras)").fetchall()
+        num_cols = len(col_info)
+        placeholders_insert = ','.join('?' * num_cols)
+    except sqlite3.Error as e:
+        print(f"Failed to get cameras schema: {e}")
+        sys.exit(1)
+    
     camera_id_list = list(camera_ids)
     
     for chunk in chunk_list(camera_id_list, BATCH_SIZE // 10):  # Smaller batch for IN clause
-        placeholders = ','.join('?' * len(chunk))
+        placeholders_where = ','.join('?' * len(chunk))
         try:
             source_cur.execute(
-                f"SELECT * FROM cameras WHERE camera_id IN ({placeholders})",
+                f"SELECT * FROM cameras WHERE camera_id IN ({placeholders_where})",
                 chunk
             )
             rows = source_cur.fetchall()
             
             if rows:
                 output_cur.executemany(
-                    "INSERT INTO cameras VALUES (?, ?, ?, ?, ?, ?)", 
+                    f"INSERT INTO cameras VALUES ({placeholders_insert})", 
                     rows
                 )
         except sqlite3.Error as e:
@@ -305,6 +314,18 @@ def filter_frames(source_cur: sqlite3.Cursor,
     """
     print("Filtering frames...")
     
+    # Check if table exists
+    try:
+        table_exists = source_cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='frames'"
+        ).fetchone()
+        if not table_exists:
+            print("Table frames does not exist, skipping...")
+            return
+    except sqlite3.Error as e:
+        print(f"Warning: Could not check frames table: {e}")
+        return
+    
     old_ids = list(image_id_map.keys())
     
     for chunk_old_ids in chunk_list(old_ids, 900):
@@ -320,11 +341,8 @@ def filter_frames(source_cur: sqlite3.Cursor,
             for row in source_cur:
                 old_frame_id, old_rig_id = row
                 new_id = image_id_map[old_frame_id]
-                new_rig_id = image_id_map.get(old_rig_id, new_id) # Logic from original code? 
-                # Original logic: new_rig_id = image_id_map.get(old_rig_id, new_id)
-                # Wait, rig_id might not be in image_id_map if it's not an image ID?
-                # In COLMAP, rig_id usually maps to image_id if derived from images?
-                # Let's keep original logic.
+                # If rig_id is in our filtered set, use the new ID; otherwise keep the default
+                new_rig_id = image_id_map.get(old_rig_id, new_id)
                 
                 batch_data.append((new_id, new_rig_id))
             
@@ -351,6 +369,18 @@ def filter_frame_data(source_cur: sqlite3.Cursor,
         image_id_map: Mapping from old image_id to new image_id
     """
     print("Filtering frame_data...")
+    
+    # Check if table exists
+    try:
+        table_exists = source_cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='frame_data'"
+        ).fetchone()
+        if not table_exists:
+            print("Table frame_data does not exist, skipping...")
+            return
+    except sqlite3.Error as e:
+        print(f"Warning: Could not check frame_data table: {e}")
+        return
     
     old_ids = list(image_id_map.keys())
     
@@ -394,6 +424,18 @@ def filter_rigs(source_cur: sqlite3.Cursor,
         image_id_map: Mapping from old image_id to new image_id
     """
     print("Filtering rigs...")
+    
+    # Check if table exists
+    try:
+        table_exists = source_cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='rigs'"
+        ).fetchone()
+        if not table_exists:
+            print("Table rigs does not exist, skipping...")
+            return
+    except sqlite3.Error as e:
+        print(f"Warning: Could not check rigs table: {e}")
+        return
     
     old_ids = list(image_id_map.keys())
     
@@ -630,18 +672,35 @@ def filter_pose_priors(source_cur: sqlite3.Cursor,
     """
     print("Filtering pose_priors...")
     
+    # Check if table exists first
+    try:
+        table_exists = source_cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='pose_priors'"
+        ).fetchone()
+        
+        if not table_exists:
+            print("Table pose_priors does not exist, skipping...")
+            return 0
+            
+        # Get column count
+        col_info = source_cur.execute("PRAGMA table_info(pose_priors)").fetchall()
+        num_cols = len(col_info)
+        placeholders_insert = ','.join('?' * num_cols)
+        
+    except sqlite3.Error as e:
+        print(f"Warning: Could not check pose_priors table: {e}")
+        return 0
+    
     try:
         source_cur.execute("SELECT * FROM pose_priors")
     except sqlite3.Error as e:
-        print(f"Failed to query pose_priors: {e}")
-        # Not all databases have pose_priors
+        print(f"Warning: Failed to query pose_priors: {e}")
         return 0
     
     prior_count = 0
     new_prior_id = 1
     batch_data = []
     
-    # Pre-fetch usually small enough
     rows = source_cur.fetchall()
     
     for row in rows:
@@ -657,17 +716,25 @@ def filter_pose_priors(source_cur: sqlite3.Cursor,
         prior_count += 1
         
         if len(batch_data) >= BATCH_SIZE:
-            output_cur.executemany(
-                "INSERT INTO pose_priors VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                batch_data
-            )
-            batch_data = []
+            try:
+                output_cur.executemany(
+                    f"INSERT INTO pose_priors VALUES ({placeholders_insert})",
+                    batch_data
+                )
+                batch_data = []
+            except sqlite3.Error as e:
+                print(f"Failed to insert pose_priors batch: {e}")
+                sys.exit(1)
             
     if batch_data:
-        output_cur.executemany(
-            "INSERT INTO pose_priors VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            batch_data
-        )
+        try:
+            output_cur.executemany(
+                f"INSERT INTO pose_priors VALUES ({placeholders_insert})",
+                batch_data
+            )
+        except sqlite3.Error as e:
+            print(f"Failed to insert remaining pose_priors: {e}")
+            sys.exit(1)
     
     print(f"Filtered to {prior_count} pose_priors")
     return prior_count
@@ -757,6 +824,12 @@ def filter_database(source_db_path: str,
             print("No images matched from the list")
             sys.exit(1)
         
+        # Verify we found all requested images
+        images_found = len(image_id_map)
+        images_requested = len(image_names)
+        if images_found < images_requested:
+            print(f"Warning: Only found {images_found} of {images_requested} requested images")
+        
         copy_cameras(source_cur, output_cur, camera_ids)
         filter_keypoints(source_cur, output_cur, image_id_map)
         filter_descriptors(source_cur, output_cur, image_id_map)
@@ -775,10 +848,23 @@ def filter_database(source_db_path: str,
         output_conn.commit()
         
         print(f"\nSuccessfully created filtered database: {output_db_path}")
-        print(f"Summary: {len(image_id_map)} images, {match_count} matches, {geom_count} geometries, {prior_count} pose priors")
+        print(f"Summary:")
+        print(f"  - Images: {len(image_id_map)} (requested: {images_requested})")
+        print(f"  - Cameras: {len(camera_ids)}")
+        print(f"  - Matches: {match_count}")
+        print(f"  - Two-view geometries: {geom_count}")
+        print(f"  - Pose priors: {prior_count}")
+        
+        # Final verification: check output database
+        output_image_count = output_cur.execute("SELECT COUNT(*) FROM images").fetchone()[0]
+        if output_image_count != len(image_id_map):
+            print(f"ERROR: Image count mismatch! Expected {len(image_id_map)}, got {output_image_count}")
+            sys.exit(1)
         
     except Exception as e:
         print(f"Unexpected error during filtering: {e}")
+        import traceback
+        traceback.print_exc()
         output_conn.rollback()
         sys.exit(1)
     finally:
