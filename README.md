@@ -105,3 +105,25 @@ Things are looking great. After learning COLMAP's DB schemas and pair encodings 
 Update #1: I've spent much time hassling with SQL for the migrations. Many assumptions were wrong and time costly. I am strongly convinced after I run out of credits in Lambda and have to bootstrap I should work in-house and private; no more colmap. That aside, I've left it to run overnight (I write overnight going to sleep at 7:00 A.M.) even though the only guarantee it's doing something are the logs by strace. It's worth trying at least once. A note for the future: back the copy of the DB with the post-feat. match data for the ~40k subset on backblaze. Should make this easier since it's only ~40GB, to download on other hosts after Lambda.
 
 Update #2: I left the pose prior mapper running overnight, and have now found that in 6hrs it only managed to register 6 images. I'm not sure where the bottleneck is but now that I'm running out of credits my main priority is iteration to have a clear research hypothesis with which to ask credits for, so I'm now running both the pose prior mapper as well as the normal mapper in parallel. I also found there is an interesting command to watch called model_analyzer that updates in real time how many images are written into the camera and frame binaries, so I'm watching it side by side for both mappers. I've backed up everything to b2 so it's theoretically easy to move this off to a different compute platform. Now I'll fix typos in this log and see where both processes end up. This might be one of my last logs where I get to actually test things, we'll see. Oh, and one important note, when I get more funding to work on this, the first thing I'll do is rebuild colmap/all the libs from scratch. To iterate quickly at the moment it's better to use them, but ad futuras they'll be more of a constraint than anything else. I think I've answered the question: are existing libraries best for this problem? They're not, not because they're bad, but because it requires deeper debugging and optimizations than they allow. It's good to know your code. 
+
+**February 2, 2026**
+
+The experiments are over.
+
+I've made some scratchpad calculations and I am in the negatives for Lambda Credits. I'll have to pay out of pocket for however many hours more I chose to run the GPUs and delete the filesystem. It seems like I burned $100/mo. Very VC-backable. Asides that, I realized I answered every question I set out to answer about what's needed to solve this problem. 
+
+I answered questions I believed would take 2-6-12 months in single days of experiments. 
+
+I now know that: 
+- **Some** type of clustering is necessary and efficient.
+- Existing libraries won't cut it. Long-term, it's worth investing in custom-built software. It's an investment that will differenciate this from one-off papers (and that can borrow from new papers, rather than being unable to call them as libraries).
+- The two areas that need to be 1-2 magnitudes better than the state of the art for full-scale reconstruction are 1) feature matching and 2) iterative, self-contained reconstructions. I think I've mostly figured out the first but still need to make it work with the second.
+- The current dataset can definitely work (it's very dense), thanks to different matching strategies, but it needs to be self-contained to specific regions of the city, both because it's computationally more efficient and because it will allow iterative updating of specific areas based on new priors.
+- Mapillary is a great API and for my use case the best feasability test (the data is not too low/high quality), but I should be careful about relying too much on guaranteed metadata priors like GPS data. 
+- However I go about building what's next, it should be comprised of very basic primitives (e.g., extract_features, match_features, compare_geometries) that are malleable and good for quickly trying out new algorithmic strategies. They should also have some unified interface for things like providing custom paths. 
+
+TL;DR: You can always go faster. 
+
+20-ish days of focused iteration were more productive than any "how will you use X resources: roadmap" I made about this project before predicted. 
+
+I've left two instances of a mapper running, one w/o any hyperparams and one with aggresive initialization params for the in-lier issues I found before. I'll leave them overnight, might find something interesting. 
