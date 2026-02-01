@@ -15,7 +15,7 @@ import argparse
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Dict, Set, Tuple, List, Any, Iterator
+from typing import Set, Tuple, List, Any, Iterator
 
 # Constants for optimization
 BATCH_SIZE = 10000  # Number of rows to process at once
@@ -136,9 +136,9 @@ def chunk_list(lst: List[Any], chunk_size: int) -> Iterator[List[Any]]:
 
 def filter_images(source_cur: sqlite3.Cursor, 
                  output_cur: sqlite3.Cursor,
-                 image_names: Set[str]) -> Tuple[Dict[int, int], Set[int]]:
+                 image_names: Set[str]) -> Tuple[Set[int], Set[int]]:
     """
-    Filter images table and build ID mapping.
+    Filter images table and collect image IDs.
     
     Args:
         source_cur: Source database cursor
@@ -146,8 +146,8 @@ def filter_images(source_cur: sqlite3.Cursor,
         image_names: Set of image names to keep
     
     Returns:
-        Tuple of (image_id_map, camera_ids) where:
-        - image_id_map: Dict mapping old image_id to new image_id
+        Tuple of (image_ids, camera_ids) where:
+        - image_ids: Set of image IDs to keep
         - camera_ids: Set of camera IDs used by filtered images
     """
     print("Filtering images...")
@@ -158,7 +158,7 @@ def filter_images(source_cur: sqlite3.Cursor,
         print(f"Failed to query images table: {e}")
         sys.exit(1)
     
-    image_id_map = {}
+    image_ids = set()
     camera_ids = set()
     batch_data = []
     
@@ -169,7 +169,7 @@ def filter_images(source_cur: sqlite3.Cursor,
             continue
         
         camera_ids.add(camera_id)
-        image_id_map[image_id] = image_id
+        image_ids.add(image_id)
         
         batch_data.append((image_id, name, camera_id))
         
@@ -194,8 +194,47 @@ def filter_images(source_cur: sqlite3.Cursor,
             print(f"Failed to insert remaining images: {e}")
             sys.exit(1)
     
-    print(f"Filtered to {len(image_id_map)} images using {len(camera_ids)} cameras")
-    return image_id_map, camera_ids
+    print(f"Filtered to {len(image_ids)} images using {len(camera_ids)} cameras")
+    return image_ids, camera_ids
+
+
+def get_frame_ids_for_images(source_cur: sqlite3.Cursor,
+                            image_ids: Set[int]) -> Set[int]:
+    """
+    Get frame_ids referenced by the provided image_ids.
+    Query frame_data where data_id (which is image_id) matches.
+    
+    Args:
+        source_cur: Source database cursor
+        image_ids: Set of image IDs to keep
+    
+    Returns:
+        Set of non-null frame_ids referenced by those images
+    """
+    if not image_ids:
+        return set()
+    
+    frame_ids: Set[int] = set()
+    image_id_list = list(image_ids)
+    
+    for chunk_ids in chunk_list(image_id_list, 900):
+        placeholders = ','.join('?' * len(chunk_ids))
+        try:
+            source_cur.execute(
+                f"SELECT frame_id FROM frame_data WHERE data_id IN ({placeholders})",
+                chunk_ids
+            )
+            rows = source_cur.fetchall()
+        except sqlite3.Error as e:
+            print(f"Failed to query frame_ids for images batch: {e}")
+            sys.exit(1)
+        
+        for row in rows:
+            frame_id = row[0]
+            if frame_id is not None:
+                frame_ids.add(frame_id)
+    
+    return frame_ids
 
 
 def copy_cameras(source_cur: sqlite3.Cursor,
@@ -246,21 +285,21 @@ def copy_cameras(source_cur: sqlite3.Cursor,
 
 def filter_keypoints(source_cur: sqlite3.Cursor,
                     output_cur: sqlite3.Cursor,
-                    image_id_map: Dict[int, int]) -> None:
+                    image_ids: Set[int]) -> None:
     """
     Filter keypoints for specified images.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        image_ids: Set of image IDs to keep
     """
     print("Filtering keypoints...")
     
     # Increase fetch size for BLOBs
     source_cur.arraysize = BATCH_SIZE
     
-    old_ids = list(image_id_map.keys())
+    old_ids = list(image_ids)
     
     # Process in chunks to avoid large IN clauses
     for chunk_old_ids in chunk_list(old_ids, 900):  # SQLite limit is often 999 vars
@@ -275,8 +314,7 @@ def filter_keypoints(source_cur: sqlite3.Cursor,
             batch_data = []
             for row in source_cur:
                 old_id = row[0]
-                new_id = image_id_map[old_id]
-                batch_data.append((new_id,) + row[1:])
+                batch_data.append((old_id,) + row[1:])
             
             if batch_data:
                 output_cur.executemany(
@@ -291,19 +329,19 @@ def filter_keypoints(source_cur: sqlite3.Cursor,
 
 def filter_descriptors(source_cur: sqlite3.Cursor,
                       output_cur: sqlite3.Cursor,
-                      image_id_map: Dict[int, int]) -> None:
+                      image_ids: Set[int]) -> None:
     """
     Filter descriptors for specified images.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        image_ids: Set of image IDs to keep
     """
     print("Filtering descriptors...")
     
     source_cur.arraysize = BATCH_SIZE
-    old_ids = list(image_id_map.keys())
+    old_ids = list(image_ids)
     
     for chunk_old_ids in chunk_list(old_ids, 900):
         placeholders = ','.join('?' * len(chunk_old_ids))
@@ -317,8 +355,7 @@ def filter_descriptors(source_cur: sqlite3.Cursor,
             batch_data = []
             for row in source_cur:
                 old_id = row[0]
-                new_id = image_id_map[old_id]
-                batch_data.append((new_id,) + row[1:])
+                batch_data.append((old_id,) + row[1:])
                 
             if batch_data:
                 output_cur.executemany(
@@ -333,14 +370,15 @@ def filter_descriptors(source_cur: sqlite3.Cursor,
 
 def filter_frames(source_cur: sqlite3.Cursor,
                  output_cur: sqlite3.Cursor,
-                 image_id_map: Dict[int, int]) -> None:
+                 frame_ids: Set[int]) -> Set[int]:
     """
-    Filter frames (frame_id corresponds to image_id).
+    Filter frames (frame_id corresponds to image_id). Keep original IDs.
+    Returns rig_ids referenced by the kept frames.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        frame_ids: Set of frame IDs to keep
     """
     print("Filtering frames...")
     
@@ -351,12 +389,16 @@ def filter_frames(source_cur: sqlite3.Cursor,
         ).fetchone()
         if not table_exists:
             print("Table frames does not exist, skipping...")
-            return
+            return set()
     except sqlite3.Error as e:
         print(f"Warning: Could not check frames table: {e}")
-        return
+        return set()
     
-    old_ids = list(image_id_map.keys())
+    if not frame_ids:
+        return set()
+    
+    rig_ids: Set[int] = set()
+    old_ids = list(frame_ids)
     
     for chunk_old_ids in chunk_list(old_ids, 900):
         placeholders = ','.join('?' * len(chunk_old_ids))
@@ -370,11 +412,8 @@ def filter_frames(source_cur: sqlite3.Cursor,
             batch_data = []
             for row in source_cur:
                 old_frame_id, old_rig_id = row
-                new_id = image_id_map[old_frame_id]
-                # If rig_id is in our filtered set, use the new ID; otherwise keep the default
-                new_rig_id = image_id_map.get(old_rig_id, new_id)
-                
-                batch_data.append((new_id, new_rig_id))
+                batch_data.append((old_frame_id, old_rig_id))
+                rig_ids.add(old_rig_id)
             
             if batch_data:
                 output_cur.executemany(
@@ -385,18 +424,22 @@ def filter_frames(source_cur: sqlite3.Cursor,
         except sqlite3.Error as e:
             print(f"Failed to filter frames batch: {e}")
             sys.exit(1)
+    
+    return rig_ids
 
 
 def filter_frame_data(source_cur: sqlite3.Cursor,
                      output_cur: sqlite3.Cursor,
-                     image_id_map: Dict[int, int]) -> None:
+                     frame_ids: Set[int]) -> Set[int]:
     """
-    Filter frame_data (frame_id and data_id both correspond to image_id).
+    Filter frame_data (data_id corresponds to image_id).
+    Keep original IDs to preserve rig relationships.
+    Returns frame_ids referenced by the kept frame_data.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        frame_ids: Set of frame IDs to keep
     """
     print("Filtering frame_data...")
     
@@ -407,12 +450,16 @@ def filter_frame_data(source_cur: sqlite3.Cursor,
         ).fetchone()
         if not table_exists:
             print("Table frame_data does not exist, skipping...")
-            return
+            return set()
     except sqlite3.Error as e:
         print(f"Warning: Could not check frame_data table: {e}")
-        return
+        return set()
     
-    old_ids = list(image_id_map.keys())
+    if not frame_ids:
+        return set()
+    
+    kept_frame_ids: Set[int] = set()
+    old_ids = list(frame_ids)
     
     for chunk_old_ids in chunk_list(old_ids, 900):
         placeholders = ','.join('?' * len(chunk_old_ids))
@@ -425,12 +472,9 @@ def filter_frame_data(source_cur: sqlite3.Cursor,
             
             batch_data = []
             for row in source_cur:
-                old_frame_id, old_data_id, sensor_id, sensor_type = row
-                new_id = image_id_map[old_frame_id]
-                new_data_id = image_id_map.get(old_data_id, new_id)
-                new_sensor_id = image_id_map.get(sensor_id, sensor_id)
-                
-                batch_data.append((new_id, new_data_id, new_sensor_id, sensor_type))
+                old_frame_id, old_data_id, old_sensor_id, sensor_type = row
+                batch_data.append((old_frame_id, old_data_id, old_sensor_id, sensor_type))
+                kept_frame_ids.add(old_frame_id)
             
             if batch_data:
                 output_cur.executemany(
@@ -441,19 +485,21 @@ def filter_frame_data(source_cur: sqlite3.Cursor,
         except sqlite3.Error as e:
             print(f"Failed to filter frame_data batch: {e}")
             sys.exit(1)
+    
+    return kept_frame_ids
 
 
 def filter_rigs(source_cur: sqlite3.Cursor,
                output_cur: sqlite3.Cursor,
-               image_id_map: Dict[int, int]) -> None:
+               rig_ids: Set[int]) -> None:
     """
     Filter rigs (rig_id corresponds to image_id).
-    ref_sensor_id should point to the camera used by this rig's image.
+    Keep original IDs to preserve rig relationships.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        rig_ids: Set of rig IDs to keep
     """
     print("Filtering rigs...")
     
@@ -469,53 +515,46 @@ def filter_rigs(source_cur: sqlite3.Cursor,
         print(f"Warning: Could not check rigs table: {e}")
         return
     
-    for old_id, new_id in image_id_map.items():
+    if not rig_ids:
+        return
+    
+    rig_id_list = list(rig_ids)
+    for chunk_rig_ids in chunk_list(rig_id_list, 900):
+        placeholders = ','.join('?' * len(chunk_rig_ids))
+        
         try:
             source_cur.execute(
-                "SELECT ref_sensor_type FROM rigs WHERE rig_id = ?",
-                (old_id,)
+                f"SELECT rig_id, ref_sensor_id, ref_sensor_type FROM rigs WHERE rig_id IN ({placeholders})",
+                chunk_rig_ids
             )
-            row = source_cur.fetchone()
-            if not row:
-                continue
-            ref_sensor_type = row[0]
+            rows = source_cur.fetchall()
         except sqlite3.Error as e:
-            print(f"Failed to query rigs for image {old_id}: {e}")
+            print(f"Failed to query rigs batch: {e}")
             sys.exit(1)
-
+        
+        if not rows:
+            continue
+        
         try:
-            output_cur.execute(
-                "SELECT camera_id FROM images WHERE image_id = ?",
-                (new_id,)
-            )
-            camera_row = output_cur.fetchone()
-            if not camera_row:
-                continue
-            correct_camera_id = camera_row[0]
-        except sqlite3.Error as e:
-            print(f"Failed to get camera for image {new_id}: {e}")
-            sys.exit(1)
-
-        try:
-            output_cur.execute(
+            output_cur.executemany(
                 "INSERT INTO rigs VALUES (?, ?, ?)",
-                (new_id, correct_camera_id, ref_sensor_type)
+                rows
             )
         except sqlite3.Error as e:
-            print(f"Failed to insert rig for image {new_id}: {e}")
+            print(f"Failed to insert rigs batch: {e}")
             sys.exit(1)
 
 
 def copy_rig_sensors(source_cur: sqlite3.Cursor,
                     output_cur: sqlite3.Cursor,
-                    image_id_map: Dict[int, int]) -> None:
+                    rig_ids: Set[int]) -> None:
     """
     Copy rig_sensors if any exist.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        rig_ids: Set of rig IDs to keep
     """
     print("Copying rig_sensors...")
     
@@ -527,7 +566,10 @@ def copy_rig_sensors(source_cur: sqlite3.Cursor,
     except sqlite3.Error:
         return
         
-    old_ids = list(image_id_map.keys())
+    if not rig_ids:
+        return
+    
+    old_ids = list(rig_ids)
     
     for chunk_old_ids in chunk_list(old_ids, 900):
         placeholders = ','.join('?' * len(chunk_old_ids))
@@ -538,16 +580,11 @@ def copy_rig_sensors(source_cur: sqlite3.Cursor,
                 chunk_old_ids
             )
             
-            batch_data = []
-            for row in source_cur:
-                old_rig_id = row[0]
-                new_id = image_id_map[old_rig_id]
-                batch_data.append((new_id,) + row[1:])
-            
-            if batch_data:
+            rows = source_cur.fetchall()
+            if rows:
                 output_cur.executemany(
                     "INSERT INTO rig_sensors VALUES (?, ?, ?, ?)",
-                    batch_data
+                    rows
                 )
         except sqlite3.Error as e:
             print(f"Failed to copy rig_sensors batch: {e}")
@@ -556,7 +593,7 @@ def copy_rig_sensors(source_cur: sqlite3.Cursor,
 
 def filter_matches(source_cur: sqlite3.Cursor,
                   output_cur: sqlite3.Cursor,
-                  image_id_map: Dict[int, int]) -> int:
+                  image_ids: Set[int]) -> int:
     """
     Filter matches for specified image pairs.
     NOTE: Matches are NOT required by COLMAP mapper - only two_view_geometries are used.
@@ -565,7 +602,7 @@ def filter_matches(source_cur: sqlite3.Cursor,
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        image_ids: Set of image IDs to keep
     
     Returns:
         Number of filtered match pairs (always 0 - skipped)
@@ -576,14 +613,14 @@ def filter_matches(source_cur: sqlite3.Cursor,
 
 def filter_two_view_geometries(source_cur: sqlite3.Cursor,
                               output_cur: sqlite3.Cursor,
-                              image_id_map: Dict[int, int]) -> int:
+                              image_ids: Set[int]) -> int:
     """
     Filter two_view_geometries for specified image pairs.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        image_ids: Set of image IDs to keep
     
     Returns:
         Number of filtered geometries
@@ -609,7 +646,7 @@ def filter_two_view_geometries(source_cur: sqlite3.Cursor,
             pair_id = row[0]
             image_id1, image_id2 = pair_id_to_image_ids(pair_id)
             
-            if image_id1 not in image_id_map or image_id2 not in image_id_map:
+            if image_id1 not in image_ids or image_id2 not in image_ids:
                 continue
             
             batch_data.append((pair_id,) + row[1:])
@@ -643,15 +680,15 @@ def filter_two_view_geometries(source_cur: sqlite3.Cursor,
 
 def filter_pose_priors(source_cur: sqlite3.Cursor,
                       output_cur: sqlite3.Cursor,
-                      image_id_map: Dict[int, int]) -> int:
+                      image_ids: Set[int]) -> int:
     """
     Filter pose_priors for specified images.
-    Keeps original pose_prior_id (primary key) and only remaps corr_data_id.
+    Keeps original pose_prior_id and corr_data_id.
     
     Args:
         source_cur: Source database cursor
         output_cur: Output database cursor
-        image_id_map: Mapping from old image_id to new image_id
+        image_ids: Set of image IDs to keep
     
     Returns:
         Number of filtered pose priors
@@ -695,13 +732,11 @@ def filter_pose_priors(source_cur: sqlite3.Cursor,
         for row in rows:
             pose_prior_id, corr_data_id = row[0], row[1]
             
-            if corr_data_id not in image_id_map:
+            if corr_data_id not in image_ids:
                 continue
             
-            new_data_id = image_id_map[corr_data_id]
-            
-            # Keep original pose_prior_id, only remap corr_data_id
-            batch_data.append((pose_prior_id, new_data_id) + row[2:])
+            # Keep original pose_prior_id and corr_data_id
+            batch_data.append((pose_prior_id, corr_data_id) + row[2:])
             prior_count += 1
         
         if len(batch_data) >= BATCH_SIZE:
@@ -807,29 +842,32 @@ def filter_database(source_db_path: str,
         
         indices = create_tables_and_get_indices(source_cur, output_cur)
         
-        image_id_map, camera_ids = filter_images(source_cur, output_cur, image_names)
+        image_ids, camera_ids = filter_images(source_cur, output_cur, image_names)
         
-        if not image_id_map:
+        if not image_ids:
             print("No images matched from the list")
             sys.exit(1)
         
         # Verify we found all requested images
-        images_found = len(image_id_map)
+        images_found = len(image_ids)
         images_requested = len(image_names)
         if images_found < images_requested:
             print(f"Warning: Only found {images_found} of {images_requested} requested images")
         
         copy_cameras(source_cur, output_cur, camera_ids)
-        filter_keypoints(source_cur, output_cur, image_id_map)
-        filter_descriptors(source_cur, output_cur, image_id_map)
-        filter_frames(source_cur, output_cur, image_id_map)
-        filter_frame_data(source_cur, output_cur, image_id_map)
-        filter_rigs(source_cur, output_cur, image_id_map)
-        copy_rig_sensors(source_cur, output_cur, image_id_map)
+        filter_keypoints(source_cur, output_cur, image_ids)
+        filter_descriptors(source_cur, output_cur, image_ids)
+        # Correct flow:
+        # images.image_id -> frame_data.data_id -> frames.frame_id -> rigs.rig_id
+        frame_ids = get_frame_ids_for_images(source_cur, image_ids)
+        kept_frame_ids = filter_frame_data(source_cur, output_cur, frame_ids)
+        rig_ids = filter_frames(source_cur, output_cur, kept_frame_ids)
+        filter_rigs(source_cur, output_cur, rig_ids)
+        copy_rig_sensors(source_cur, output_cur, rig_ids)
         
-        match_count = filter_matches(source_cur, output_cur, image_id_map)
-        geom_count = filter_two_view_geometries(source_cur, output_cur, image_id_map)
-        prior_count = filter_pose_priors(source_cur, output_cur, image_id_map)
+        match_count = filter_matches(source_cur, output_cur, image_ids)
+        geom_count = filter_two_view_geometries(source_cur, output_cur, image_ids)
+        prior_count = filter_pose_priors(source_cur, output_cur, image_ids)
         
         # Create indices at the end
         create_indices(output_cur, indices)
@@ -838,7 +876,7 @@ def filter_database(source_db_path: str,
         
         print(f"\nSuccessfully created filtered database: {output_db_path}")
         print(f"Summary:")
-        print(f"  - Images: {len(image_id_map)} (requested: {images_requested})")
+        print(f"  - Images: {len(image_ids)} (requested: {images_requested})")
         print(f"  - Cameras: {len(camera_ids)}")
         print(f"  - Matches: {match_count}")
         print(f"  - Two-view geometries: {geom_count}")
@@ -846,8 +884,8 @@ def filter_database(source_db_path: str,
         
         # Final verification: check output database
         output_image_count = output_cur.execute("SELECT COUNT(*) FROM images").fetchone()[0]
-        if output_image_count != len(image_id_map):
-            print(f"ERROR: Image count mismatch! Expected {len(image_id_map)}, got {output_image_count}")
+        if output_image_count != len(image_ids):
+            print(f"ERROR: Image count mismatch! Expected {len(image_ids)}, got {output_image_count}")
             sys.exit(1)
         
     except Exception as e:
