@@ -82,7 +82,7 @@ def reconstruction(database_path, image_path, output_path, image_list_path, snap
         "--image_path", str(image_path),
         "--output_path", str(output_path),
         "--Mapper.snapshot_path", str(snapshot_path),
-        "--Mapper.snapshot_frames_freq", int(snapshot_frames_freq),
+        "--Mapper.snapshot_frames_freq", str(snapshot_frames_freq),
         "--Mapper.image_list_path", str(image_list_path),
         "--Mapper.ba_use_gpu", "1",
         "--Mapper.ba_gpu_index", "-1",                 # Auto-detect GPU
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--snapshot_frames_freq",
-        type=int,
+        type=str,
         required=True,
         help="Number of frames registered needed to save snapshot"
     )
