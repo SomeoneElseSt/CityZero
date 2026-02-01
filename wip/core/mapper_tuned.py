@@ -36,7 +36,7 @@ import sys
 from datetime import datetime
 
 
-def reconstruction(database_path, image_path, output_path, image_list_path) -> None:
+def reconstruction(database_path, image_path, output_path, image_list_path, snapshot_path, snapshot_frames_freq) -> None:
 
     if database_path is None or not database_path:
         print("Database Path is None. Please provide a valid database path")
@@ -66,6 +66,10 @@ def reconstruction(database_path, image_path, output_path, image_list_path) -> N
         print(f"Creating output directory: {output_path}")
         os.makedirs(output_path, exist_ok=True)
 
+    if not os.path.exists(snapshot_path):
+        print(f"Creating snapshot output directory: {snapshot_path}")
+        os.makedirs(snapshot_path, exist_ok=True)
+
     timestamp = datetime.now().strftime("%d%m%Y")
     log_file_path = f"{timestamp}_mapper_log.txt"
 
@@ -77,6 +81,8 @@ def reconstruction(database_path, image_path, output_path, image_list_path) -> N
         "--database_path", str(database_path),
         "--image_path", str(image_path),
         "--output_path", str(output_path),
+        "--Mapper.snapshot_path", str(snapshot_path),
+        "--Mapper.snapshot_frames_freq", int(snapshot_frames_freq),
         "--Mapper.image_list_path", str(image_list_path),
         "--Mapper.ba_use_gpu", "1",
         "--Mapper.ba_gpu_index", "-1",                 # Auto-detect GPU
@@ -137,6 +143,18 @@ if __name__ == "__main__":
         required=True,
         help="Path to .txt file containing list of images to reconstruct",
     )
+    parser.add_argument(
+        "--snapshot_path",
+        type=str,
+        required=True,
+        help="Path to save periodical Mapper reconstructions",
+    )
+    parser.add_argument(
+        "--snapshot_frames_freq",
+        type=int,
+        required=True,
+        help="Number of frames registered needed to save snapshot"
+    )
 
     args = parser.parse_args()
 
@@ -145,4 +163,6 @@ if __name__ == "__main__":
         args.image_path,
         args.output_path,
         args.image_list_path,
+        args.snapshot_path,
+        args.snapshot_frames_freq
     )
