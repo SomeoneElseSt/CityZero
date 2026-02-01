@@ -31,6 +31,7 @@ data/maps/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/maps/.gitkeep
+wip/db_info/
 
 # Outputs
 outputs/models/*

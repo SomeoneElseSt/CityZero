@@ -82,7 +82,7 @@ def reconstruction(database_path, image_path, output_path, image_list_path, snap
         "--image_path", str(image_path),
         "--output_path", str(output_path),
         "--Mapper.snapshot_path", str(snapshot_path),
-        "--Mapper.snapshot_frames_freq", str(snapshot_frames_freq),
+        "--Mapper.snapshot_frames_freq", str(snapshot_frames_freq), # Note: if nothing is saved under snapshots that might mean not enough frames were registered. Consider lowering this parameter. 
         "--Mapper.image_list_path", str(image_list_path),
         "--Mapper.ba_use_gpu", "1",
         "--Mapper.ba_gpu_index", "-1",                 # Auto-detect GPU
