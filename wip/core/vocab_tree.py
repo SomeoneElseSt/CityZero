@@ -1,6 +1,8 @@
 """
 I figured that since the default vocabulary by COLMAP isn't fully centered on urban images
 it makes more sense to train a custom vocab tree for feature matching down the line. This script does that. 
+
+Note: I tried building a Vocab Tree using this script but it took too long and finding I had the GPS coordinates of each image made this approach not worth it. Went with the spatial matcher + query expansion instead. 
 """
 
 import argparse

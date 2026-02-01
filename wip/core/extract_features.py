@@ -1,6 +1,7 @@
 """
 Extracts features assuming no shared cameras and no shared focal distances. 
 
+Note: takes about 8hrs for 600k+ images. 
 """
 
 import argparse

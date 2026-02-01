@@ -1,3 +1,6 @@
+IMPORTANT: This is the legacy workflow I tried at first. I've since moved to the new workflow in the wip/core directory (namely build_colmap.py, extract_features.py, matches_importer.py,query_expansion.py and mapper_tuned.py in order), supported by the data pre-processing and scripts in the wip/segmentation_experiments/segmentation_scripts/ directory and wip/scripts/ directory.
+
+
 # Local Tests - Lambda Cloud GPU Preprocessing
 
 Testing 3D reconstruction pipeline on Financial District subset (2,998 images) before full SF dataset.

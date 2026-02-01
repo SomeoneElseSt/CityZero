@@ -1,6 +1,7 @@
 """
 Feature match images using previously computed database.db and custom vocab tree
 
+Note: This script wasn't really used in the end because building the custom vocabulary tree took too long. 
 """
 
 import argparse
