@@ -149,7 +149,7 @@ cmd = [
 
 And another one using aggresively tuned initialization hyperparameters. The latter ended up crashing out because the BA adjustment step found all the images it managed to register as unsuitable.
 
-But the simple one managed to save a snapshot with all ~40k images registered (!):
+But the simple one managed to save a snapshot with all ~40k images loaded (!) and 500 registered:
 
 ```
 colmap model_analyzer --path snapshots_mapper_v2/1769991227489/
@@ -168,17 +168,17 @@ I0202 04:01:30.891404 953494 model.cc:465] Mean reprojection error: 0.927948px
 
 This is extremely promising. Although a bit abnormal. Whilst it was running it would go from using 1-core to all-cores periodically, but with no new outputs to its binaries. In fact, its binaries (it made two: 0,1) never grew past 11 and 2 images registered, and they never loaded the full set of cameras and rigs.
 
-Why did it save a snapshot but not update its binaries -- maybe because its only supposed to update its binaries when it can't keep on reconstructing them (localized outlier regions, saved as separate folders), which implies that despite failing to converge in a single model there was a third that was growing and > 500 registered images at the time I killed the process. It's also strange there were no prints, even though the straces showed it was doing work all the time. 
+Why did it save a snapshot but not update its binaries -- maybe because its only supposed to update its binaries when it can't keep on reconstructing them (localized outlier regions, saved as separate folders), which implies that despite failing to converge in a single model there was a third that was growing and had > 500 registered images at the time I killed the process. It's also strange there were no prints, even though the straces showed it was doing work all the time. 
 
 I killed the process because in the straces it showed no meaningful progress. By the time I had done so and checked the snapshots is when I found it actually was onto something.  It's good to know that with more CPUs + more time there is an underlying reconstruction in my mapper.db.
 
 For now I'll wipe the Lambda and backup everything now that I've ran out of free credits. Then I'll visualize the snapshot and look for other compute platforms to try again (I think Google Cloud has VMs with 96-cores and $300 credits as a sign-up bonus). 
 
-Another good thing is that I can pipe the snapshot as a starting point in my next run with a flag:
+Another good thing is that I can pipe the snapshot as a starting point in my next run adding this flag:
 
 
 ```
---input_path snapshots_mapper_v2/1769991227489 \
+--input_path snapshots_mapper_v2/1769991227489
 
 ```
 
