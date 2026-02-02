@@ -126,4 +126,61 @@ TL;DR: You can always go faster.
 
 20-ish days of focused iteration were more productive than any "how will you use X resources: roadmap" I made about this project before predicted. 
 
-I've left two instances of a mapper running, one w/o any hyperparams and one with aggresive initialization params for the in-lier issues I found before. I'll leave them overnight, might find something interesting. 
+I've left two instances of a mapper running, one w/o any hyperparams and one with aggresive initialization params for the in-lier issues I found before. I'll leave them overnight, might find something interesting.
+
+Update #1: Holy shit. I might've caught onto something. I left two runs for the night, one only using a normal mapper:
+
+```
+cmd = [
+	"colmap"
+	"mapper"
+	"--database_path", str (database_path),
+	"--image_path", str(image_path),
+	"--output_path", str(output_path),
+	"--Mapper.snapshot_path", str(snapshot_path),
+	"--Mapper. snapshot_frames_freq", str(snapshot_frames_freq),
+	"--Mapper. image_list_path", str(image_list_path),
+	"--Mapper. ba_use_gpu", "1"
+	"--Mapper. ba_gpu_index",, "-1"
+	"--Mapper.num_threads", "-1"
+	"--Mapper. ignore_watermarks, "1"
+	]
+``` 
+
+And another one using aggresively tuned initialization hyperparameters. The latter ended up crashing out because the BA adjustment step found all the images it managed to register as unsuitable.
+
+But the simple one managed to save a snapshot with all ~40k images registered (!):
+
+```
+colmap model_analyzer --path snapshots_mapper_v2/1769991227489/
+I0202 04:01:30.891213 953494 model.cc:449] Rigs: 38479
+I0202 04:01:30.891311 953494 model.cc:450] Cameras: 38479
+I0202 04:01:30.891315 953494 model.cc:451] Frames: 502
+I0202 04:01:30.891319 953494 model.cc:452] Registered frames: 502
+I0202 04:01:30.891322 953494 model.cc:454] Images: 502
+I0202 04:01:30.891325 953494 model.cc:455] Registered images: 502
+I0202 04:01:30.891328 953494 model.cc:457] Points: 17116
+I0202 04:01:30.891331 953494 model.cc:458] Observations: 659106
+I0202 04:01:30.891367 953494 model.cc:460] Mean track length: 38.508179
+I0202 04:01:30.891389 953494 model.cc:462] Mean observations per image: 1312.960159
+I0202 04:01:30.891404 953494 model.cc:465] Mean reprojection error: 0.927948px
+```
+
+This is extremely promising. Although a bit abnormal. Whilst it was running it would go from using 1-core to all-cores periodically, but with no new outputs to its binaries. In fact, its binaries (it made two: 0,1) never grew past 11 and 2 images registered, and they never loaded the full set of cameras and rigs.
+
+Why did it save a snapshot but not update its binaries -- maybe because its only supposed to update its binaries when it can't keep on reconstructing them (localized outlier regions, saved as separate folders), which implies that despite failing to converge in a single model there was a third that was growing and > 500 registered images at the time I killed the process. It's also strange there were no prints, even though the straces showed it was doing work all the time. 
+
+I killed the process because in the straces it showed no meaningful progress. By the time I had done so and checked the snapshots is when I found it actually was onto something.  It's good to know that with more CPUs + more time there is an underlying reconstruction in my mapper.db.
+
+For now I'll wipe the Lambda and backup everything now that I've ran out of free credits. Then I'll visualize the snapshot and look for other compute platforms to try again (I think Google Cloud has VMs with 96-cores and $300 credits as a sign-up bonus). 
+
+Another good thing is that I can pipe the snapshot as a starting point in my next run with a flag:
+
+
+```
+--input_path snapshots_mapper_v2/1769991227489 \
+
+```
+
+
+ 
