@@ -182,5 +182,25 @@ Another good thing is that I can pipe the snapshot as a starting point in my nex
 
 ```
 
+Update #1: I've exported the .ply from the binaries. This is how it looks like:
 
- 
+![.ply files visualization at 500 images registered](./assets/post-train/ply-exports.png)
+
+The left visualization shows the visualization in Brush as a polygonal file, while the right visualization shows the raw camera positions and meshes made by the mapper. 
+
+Overall, it's not bad. It makes sense that the two clusters of cameras are registered sequentially, given that a lot of the captured images are made by dash cams of drivers going straight through each street of Sunset, so I'd expect each mesh/polygon cluster to be one specific street where most images look alike to each other and it's easy for COLMAP to register new ones. It also explains why most computations I saw in strace were done in brief burts. It's just placing images in front of each other and triangulating many similar looking features. Nevermind the colors, these are minimized against the original images in the Gaussian optimization step.
+
+Below, a close up of registered cameras aligns with the above explanation. It also shows that it may be possible to obtain equiparable results with less images arranged sequentially, e.g., by sampling every Nth image when images are arranged in a straight line (as with dashcams and straight roads).
+
+![Close up of registered cameras and meshes. Cameras are shown in red and are mostly aligned sequentially.](./assets/post-train/ply-cameras-example.png)
+
+
+As for the other two resulting binaries, one wasn't anything worth looking at (only 2 registered images), while the other showed a similar "shotgun" spread initialization as the top left cluster in the first image, which also suggests colmap is having an easier time registering images in a straight line than in a more scattered pattern (this is where the BA might be falling apart).
+
+![Image of the second resulting binary. Shows small 11-image reconstruction](./assets/post-train/ply-cameras-example-2.png)
+
+My only concern is that given the straight line pattern of most images, colmap may struggle to connect intersections, or alternatively, will create micro, disconnected registrations. In the worst case, it could just as well make 100 individual straight lines of individual streets alongside each other and not ever connect them.
+
+I'll use future checkpoints to monitor this doesn't happen, and if it does, I think the easiest fix could be to set the two initialization images to be exactly at the center/at a big intersection. 
+
+Should also think about whether any fluid simulations — treating the roads as paths and the mapper process as a liquid — could help. There may be an optimal strategy where many mini-mappers are spawned and connected iteratively. It's also very feasable thanks to GPS data. 
