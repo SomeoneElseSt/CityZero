@@ -182,7 +182,7 @@ Another good thing is that I can pipe the snapshot as a starting point in my nex
 
 ```
 
-Update #1: I've exported the .ply from the binaries. This is how it looks like:
+Update #2: I've exported the .ply from the binaries. This is how it looks like:
 
 ![.ply visualization in Brush of most succesful run.](./assets/post-train/ply-exports-brush.png)
 
@@ -207,3 +207,12 @@ My only concern is that given the straight line pattern of most images, colmap m
 I'll use future checkpoints to monitor this doesn't happen, and if it does, I think the easiest fix could be to set the two initialization images to be exactly at the center/at a big intersection. 
 
 Should also think about whether any fluid simulations — treating the roads as paths and the mapper process as a liquid — could help. There may be an optimal strategy where many mini-mappers are spawned and connected iteratively. It's also very feasable thanks to GPS data. 
+
+**February 6, 2026**
+
+Things are moving along. I got $100 in GPU credits from AMD and $15 on Runpod. It's not much but at least I still have access to supercomputers (+ AMDs are CPU-core heavy, which will be helpful to finish the last reconstruction). 
+
+For the days between the last log and this one I built a tool to make it easier to film myself talking (teleme) for whatever videos I need to film in order to get more compute. The only platform I haven't checked out is GCloud, will do soon. 
+
+
+ 
