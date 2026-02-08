@@ -214,5 +214,7 @@ Things are moving along. I got $100 in GPU credits from AMD and $15 on Runpod. I
 
 For the days between the last log and this one I built a tool to make it easier to film myself talking (teleme) for whatever videos I need to film in order to get more compute. The only platform I haven't checked out is GCloud, will do soon. 
 
+**February 8, 2026**
 
+I'm applying to accelerators/grants/etc now. I'll also change some things in teleme; it's actually quite useful for this, just need some edges smoothed out.
  
