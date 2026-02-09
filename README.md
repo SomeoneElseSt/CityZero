@@ -218,3 +218,6 @@ For the days between the last log and this one I built a tool to make it easier 
 
 I'm applying to accelerators/grants/etc now. I'll also change some things in teleme; it's actually quite useful for this, just need some edges smoothed out.
  
+**February 9, 2026**
+
+I just had a small dental surgery. Will be on recovery (+ pinned by academics) for until at least a week or so. I'll spin up the AMD compute to keep building on the last reconstruction, but at least for a while I'll take a step back and focus on reading about what are the core primitives I'll need to build. I also found [this](https://www.4dv.ai) very interesting company that is doing 4D Gaussians, i.e., they take many snapshots of a scene with Gaussians and chain them together so it plays back like a video. It is very realistic. I think this is how I see the replicas working in the future; it'll be just like our world except you can peer in and move around. They're a Chinese lab, it seems. I'll reach out to them, see what I can learn about their tech.  
