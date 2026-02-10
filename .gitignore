@@ -49,6 +49,7 @@ wip/outputs/
 # Compressed archives and SSH keys
 *.tar.gz
 *.pem
+*.pub
 
 # Cache
 wip/scripts/uploaded_images.json

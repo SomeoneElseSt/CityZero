@@ -221,3 +221,7 @@ I'm applying to accelerators/grants/etc now. I'll also change some things in tel
 **February 9, 2026**
 
 I just had a small dental surgery. Will be on recovery (+ pinned by academics) for until at least a week or so. I'll spin up the AMD compute to keep building on the last reconstruction, but at least for a while I'll take a step back and focus on reading about what are the core primitives I'll need to build. I also found [this](https://www.4dv.ai) very interesting company that is doing 4D Gaussians, i.e., they take many snapshots of a scene with Gaussians and chain them together so it plays back like a video. It is very realistic. I think this is how I see the replicas working in the future; it'll be just like our world except you can peer in and move around. They're a Chinese lab, it seems. I'll reach out to them, see what I can learn about their tech.  
+
+**February 10, 2026**
+
+Just got access to AMD GPU Droplets. It's different, but not too different. I'm downloading the data from Backblaze and will change make new, non-CUDA scripts. Note that to ssh now it's ```ssh -i amd.pem root@<ip>``` and to scp it's the same as before but with ```root@``` instead of ```ubuntu@``` and persistent storage is saved under /home. 
