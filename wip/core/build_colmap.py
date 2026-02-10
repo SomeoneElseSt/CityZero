@@ -114,15 +114,15 @@ def install_dependencies() -> None:
                DEBIAN_FRONTEND="noninteractive",
                NEEDRESTART_MODE="a",
                NEEDRESTART_SUSPEND="1")
-    run_command(["sudo", "apt", "update"], "Failed to update apt package list", env=env, capture_output=False)
+    run_command(["sudo", "apt", "update"], "Failed to update apt package list", env=env)
 
     print("Resolving package conflicts...")
-    subprocess.run(["sudo", "apt", "remove", "-y", "ucx", "libucx0"], env=env)
-    subprocess.run(["sudo", "apt", "upgrade", "-y"], env=env)
+    subprocess.run(["sudo", "apt", "remove", "-y", "ucx", "libucx0"], env=env, capture_output=True)
+    subprocess.run(["sudo", "apt", "upgrade", "-y"], env=env, capture_output=True)
 
     print("Installing dependencies...")
     cmd = ["sudo", "apt", "install", "-y"] + packages
-    run_command(cmd, "Failed to install dependencies", env=env, capture_output=False)
+    run_command(cmd, "Failed to install dependencies", env=env)
 
     print("All dependencies installed")
 
@@ -148,7 +148,7 @@ def build_ceres_with_cuda() -> None:
         sys.exit(1)
     keyring_src = max(keyring_files, key=os.path.getmtime)
     keyring_dest = "/usr/share/keyrings/"
-    run_command(["sudo", "cp", keyring_src, keyring_dest], "Failed to copy CUDS keyring", capture_output=False)
+    run_command(["sudo", "cp", keyring_src, keyring_dest], "Failed to copy CUDS keyring")
     
     print("Updating apt package list...")
     env = dict(os.environ, 
@@ -316,7 +316,7 @@ def build_colmap_from_source() -> None:
     build_cmd = ["ninja", "-j", str(num_cores)]
     start_time = datetime.now()
 
-    result = subprocess.run(build_cmd, cwd=build_dir)
+    result = subprocess.run(build_cmd, cwd=build_dir, capture_output=True, text=True)
     duration = (datetime.now() - start_time).total_seconds()
 
     if result.returncode != 0:
