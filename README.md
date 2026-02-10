@@ -225,3 +225,12 @@ I just had a small dental surgery. Will be on recovery (+ pinned by academics) f
 **February 10, 2026**
 
 Just got access to AMD GPU Droplets. It's different, but not too different. I'm downloading the data from Backblaze and will change make new, non-CUDA scripts. Note that to ssh now it's ```ssh -i amd.pem root@<ip>``` and to scp it's the same as before but with ```root@``` instead of ```ubuntu@``` and persistent storage is saved under /home. 
+
+Update #1: AMD is very fast. Very very fast. I used to measure speed on Lambda by seeing how fast the scrollbar would go up when tracing the mappers. In AMD it must be at least twice as fast. 
+
+Update #2: I left a reconstruction job running overnight. It's doing good. It made two more snapshots, at 602 and 702 registered frames respectively. The mean track lenght is increasing, as are the mean observations per image (~1.4k), while the mean reprojection error is decreasing, so it's fairly promising. I'm just hoping it's not overfitting and collapse later. I'll inspect the binaries to see how's progress. 
+
+![.ply visualization of polygon export at 702 registered frames](./assets/post-train/ply-exports-colmap-v2.png)
+
+
+The export looks really good. Compared to the last polygon visualization I made, it's clear the clouds are becoming more dense and closely matched to each other. The upper right one kind of looks like Japan! The next big thing I expect to happen is that a new cluster appears (e.g. a new street, part of the neighboorhood, etc). I'm just hoping that happens before I run out of credits. I'll leave it running for the 25hrs-ish I've got left in compute time, evac the last snapshot, and look for compute somewhere else. It's like guerrilla inference. 
