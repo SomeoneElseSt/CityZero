@@ -230,7 +230,6 @@ Update #1: AMD is very fast. Very very fast. I used to measure speed on Lambda b
 
 Update #2: I left a reconstruction job running overnight. It's doing good. It made two more snapshots, at 602 and 702 registered frames respectively. The mean track lenght is increasing, as are the mean observations per image (~1.4k), while the mean reprojection error is decreasing, so it's fairly promising. I'm just hoping it's not overfitting and collapse later. I'll inspect the binaries to see how's progress. 
 
-![.ply visualization of polygon export at 702 registered frames](./assets/post-train/ply-exports-colmap-v2.png)
-
+![.ply visualization of polygon export at 702 registered frames](./assets/post-train/ply-exports-brush-v2.png)
 
 The export looks really good. Compared to the last polygon visualization I made, it's clear the clouds are becoming more dense and closely matched to each other. The upper right one kind of looks like Japan! The next big thing I expect to happen is that a new cluster appears (e.g. a new street, part of the neighboorhood, etc). I'm just hoping that happens before I run out of credits. I'll leave it running for the 25hrs-ish I've got left in compute time, evac the last snapshot, and look for compute somewhere else. It's like guerrilla inference. 
