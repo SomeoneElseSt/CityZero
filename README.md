@@ -238,7 +238,7 @@ The export looks really good. Compared to the last polygon visualization I made,
 
 I think it's pointless to look for more compute without superlinear returns.
 
-These were the birth (creation) dates and times of the snapshot that the AMD run has made so far:
+These were the birth (creation) dates and times of the snapshots that the AMD run has made so far:
 
 ```
 602 reg_frames | Birth: 2026-02-10 17:43:51.217720968 +0000
@@ -247,7 +247,7 @@ These were the birth (creation) dates and times of the snapshot that the AMD run
 902 reg_frames | Birth: 2026-02-11 07:55:29.611204757 +0000
 ```
 
-Except for the last snapshot, it seems like 100-frame increments are linear, with 1-2 hour increments in-between reconstructions. 
+Except for the last snapshot, it seems like 100-frame increments grow in time  linearly, with 1-2 hour increments in-between reconstructions. 
 
 ```
 602 → 702: 3h 40m 29s
@@ -267,13 +267,17 @@ Where n is the number of increments, t1 is the starting point, so 8hrs, and d is
 
 390 / 2 * (2 * 8 + 389 * 1.5) = 195 * 599.5 = 116,902hrs or 13 years [in compute time]
 
-Or 116,902hrs * $2 = $233,804, aka absolutely not happening. Not because it's impossible — by AI standards this is cheap — but because it implies that scaling this for a ~500k dataset is going to cost millions of dollars, and as I found before, that dataset is not even the whole of San Francisco! 
+Or 116,902hrs * $2 = $233,804, aka absolutely not happening. 
 
-Now, this also rests on a big assumption about linearity. My empirical understanding is that the mapper will take longer as more frames are added because it's solving some optimization problems globally, so strict linearity might actually be a type of best-case scenario. 
+Not because it's impossible — by AI standards this is cheap — but because it implies that scaling this for a ~500k dataset is going to cost millions of dollars, and as I found before, my dataset is not even the whole of San Francisco! 
+
+Now, this also rests on a big assumption about linearity. My empirical understanding is that the mapper will take longer as more frames are added because it's solving some optimization problems globally, so strict linearity might actually be a best-case scenario. 
 
 If linearity is true, it also means a twice as powerful computer (which is really not a hard step up from my 20 core droplet) should only take 6.5 years and cost the same amount, assuming compute cost also scales linearly and there is perfect parallelization. 
 
 My point is, without messing around with colmap's internals, this is a trivial more in -> more out problem where a lab can outfinance or outcompute me (specially if my linear compute assumption is true) and there is no real differenciator.
 
-So the plan is, I'll kill the AMD run tomorrow when credits run out, for whatever I may be able to learn. I won't ask focus on gaining more credits or funding for credits anymore. Instead, I'll focus on re-building a mapper pipeline that can re-use my existing query expansion DB. Ideally I'd tackle the whole pipeline but due to time constraints, it's better to only re-invent a wheel rather than the whole engine. The goal here is borrow from geo-hacks I did before to achieve superlinear returns. Twice as much compute should 10x my speed gains, otherwise this really isn't gonna work at the biggest scale.  
+So the plan is, I'll kill the AMD run tomorrow when credits run out, for whatever I may be able to learn. I won't focus on gaining more credits or funding for credits anymore. 
+
+Instead, I'll focus on re-building a mapper pipeline that can re-use my existing query expansion DB. Ideally I'd tackle the whole pipeline but due to time constraints, it's better to only re-invent a wheel rather than the whole engine. The goal here is borrow from geo-hacks I did before to achieve superlinear returns. Twice as much compute should 10x my speed gains, otherwise this really isn't gonna work at the biggest scale.  
  
