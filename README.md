@@ -269,7 +269,7 @@ Where n is the number of increments, t1 is the starting point, so 8hrs, and d is
 
 Or 116,902hrs * $2 = $233,804, aka absolutely not happening. 
 
-Not because it's impossible — by AI standards this is cheap — but because it implies that scaling this for a ~500k dataset is going to cost millions of dollars, and as I found before, my dataset is not even the whole of San Francisco! 
+Not because it's impossible — by AI standards this is cheap — but because it implies that scaling this for a ~500k dataset is going to cost millions of dollars (at a ballpark estimate, if each neighborhood is 40k imgs. and costs ~200k, (500,000 / 40,000) * $200.000 = $2,500,000 🤑), and as I found before, my dataset is not even the whole of San Francisco! 
 
 Now, this also rests on a big assumption about linearity. My empirical understanding is that the mapper will take longer as more frames are added because it's solving some optimization problems globally, so strict linearity might actually be a best-case scenario. 
 
