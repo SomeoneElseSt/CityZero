@@ -233,3 +233,47 @@ Update #2: I left a reconstruction job running overnight. It's doing good. It ma
 ![.ply visualization of polygon export at 702 registered frames](./assets/post-train/ply-exports-brush-v2.png)
 
 The export looks really good. Compared to the last polygon visualization I made, it's clear the clouds are becoming more dense and closely matched to each other. The upper right one kind of looks like Japan! The next big thing I expect to happen is that a new cluster appears (e.g. a new street, part of the neighboorhood, etc). I'm just hoping that happens before I run out of credits. I'll leave it running for the 25hrs-ish I've got left in compute time, evac the last snapshot, and look for compute somewhere else. It's like guerrilla inference. 
+
+**February 11, 2026**
+
+I think it's pointless to look for more compute without superlinear returns.
+
+These were the birth (creation) dates and times of the snapshot that the AMD run has made so far:
+
+```
+602 reg_frames | Birth: 2026-02-10 17:43:51.217720968 +0000
+702 reg_frames | Birth: 2026-02-10 21:24:20.317331979 +0000
+802 reg_frames | Birth: 2026-02-11 01:36:45.778707771 +0000
+902 reg_frames | Birth: 2026-02-11 07:55:29.611204757 +0000
+```
+
+Except for the last snapshot, it seems like 100-frame increments are linear, with 1-2 hour increments in-between reconstructions. 
+
+```
+602 → 702: 3h 40m 29s
+702 → 802: 4h 12m 25s
+802 → 902: 6h 18m 44s
+```
+
+If these 1-2 hour increments per 100 extra registered frames keep happening, with each hour billed at $2, until ~40k frames are registered, this run will cost:
+
+39000 / 100 = 390 increments (minus the ~1k-ish already computed)
+
+Starting at 8hrs, adding 1.5hrs per increment, following an arithmetic series:
+
+Total = n/2 * (2 * t1 + (n - 1)d)
+
+Where n is the number of increments, t1 is the starting point, so 8hrs, and d is the step, at 1.5hrs approx:
+
+390 / 2 * (2 * 8 + 389 * 1.5) = 195 * 599.5 = 116,902hrs or 13 years [in compute time]
+
+Or 116,902hrs * $2 = $233,804, aka absolutely not happening. Not because it's impossible — by AI standards this is cheap — but because it implies that scaling this for a ~500k dataset is going to cost millions of dollars, and as I found before, that dataset is not even the whole of San Francisco! 
+
+Now, this also rests on a big assumption about linearity. My empirical understanding is that the mapper will take longer as more frames are added because it's solving some optimization problems globally, so strict linearity might actually be a type of best-case scenario. 
+
+If linearity is true, it also means a twice as powerful computer (which is really not a hard step up from my 20 core droplet) should only take 6.5 years and cost the same amount, assuming compute cost also scales linearly and there is perfect parallelization. 
+
+My point is, without messing around with colmap's internals, this is a trivial more in -> more out problem where a lab can outfinance or outcompute me (specially if my linear compute assumption is true) and there is no real differenciator.
+
+So the plan is, I'll kill the AMD run tomorrow when credits run out, for whatever I may be able to learn. I won't ask focus on gaining more credits or funding for credits anymore. Instead, I'll focus on re-building a mapper pipeline that can re-use my existing query expansion DB. Ideally I'd tackle the whole pipeline but due to time constraints, it's better to only re-invent a wheel rather than the whole engine. The goal here is borrow from geo-hacks I did before to achieve superlinear returns. Twice as much compute should 10x my speed gains, otherwise this really isn't gonna work at the biggest scale.  
+ 
