@@ -281,3 +281,31 @@ So the plan is, I'll kill the AMD run tomorrow when credits run out, for whateve
 
 Instead, I'll focus on re-building a mapper pipeline that can re-use my existing query expansion DB. Ideally I'd tackle the whole pipeline but due to time constraints, it's better to only re-invent a wheel rather than the whole engine. The goal here is borrow from geo-hacks I did before to achieve superlinear returns. Twice as much compute should 10x my speed gains, otherwise this really isn't gonna work at the biggest scale.  
  
+**February 12, 2026**
+
+```
+602   → 702: 3h 40m 29s
+702   → 802: 4h 12m 25s
+802   → 902: 6h 18m 44s
+902  → 1002: 7h 52m 28s 
+1002 → 1102: 6h 9m 35s  
+1102 → 1202: 6h 42m 23s 
+```
+ 
+Interesting. It seems my growth estimations from yesterday might not hold up. Assuming a constant 6 hours per increment and 390 increments: (6 * 390) * $2 = $4,680. Then again, the only way to validate if it's actually constant is to spend some more. Hmm. Still promising.
+
+Note: the AMD set up was ran on an Intel Platinum 8568Y+ w/20 cores 
+
+Update #1: I left it running to make one last reconstruction (1303 frames) with my own money, because I wanted to corroborate if the 6hrs per 100 frames increment were holding up, and it seems like they are:
+
+```
+602  → 702 : 3h 40m 29s
+702  → 802 : 4h 12m 25s
+802  → 902 : 6h 18m 44s
+902  → 1002: 7h 52m 28s
+1002 → 1102: 6h 9m 35s
+1102 → 1202: 6h 42m 23s
+1202 → 1302: 6h 43m 16s
+```
+
+The best way to test this for sure is actually quite simple. I'll make another AMD Developer account with a different mail and spin up an instance of 8x identical VMs to the one I used for this run. They should in theory only take 45 minutes, assuming linearity. Also, I noticed COLMAP sometimes hangs on a single thread when for e.g. de-allocating and allocating bytes for the global optimizer, so that might stop the scaling from being fully linear, but it's a good next experiment. If true, it'd make it very easy to put a number on how much I need to complete a full run and how much time it'd take. 
