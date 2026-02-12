@@ -313,3 +313,5 @@ The best way to test this for sure is actually quite simple. I'll make another A
 Update #2: Got the credits, but they're out of capacity for the 8x clusters. Will hold out and test. 
 
 Update #3: Got a single Cluster to install deps. and download everything on to, will expand as soon as they've got capacity. 
+
+Update #4: I found out that a single GPU can't have other GPUs added to it, and given no 8x clusters are available, I'll shut it off and try again tomorrow. Starting a new one was helpful though. Got to refine some commands, also made a .tar backup of the images because it was taking almost ~1hr30min to download everything. The .tar should make it much faster.
