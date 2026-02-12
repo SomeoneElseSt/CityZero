@@ -309,3 +309,7 @@ Update #1: I left it running to make one last reconstruction (1303 frames) with 
 ```
 
 The best way to test this for sure is actually quite simple. I'll make another AMD Developer account with a different mail and spin up an instance of 8x identical VMs to the one I used for this run. They should in theory only take 45 minutes, assuming linearity. Also, I noticed COLMAP sometimes hangs on a single thread when for e.g. de-allocating and allocating bytes for the global optimizer, so that might stop the scaling from being fully linear, but it's a good next experiment. If true, it'd make it very easy to put a number on how much I need to complete a full run and how much time it'd take. 
+
+Update #2: Got the credits, but they're out of capacity for the 8x clusters. Will hold out and test. 
+
+Update #3: Got a single Cluster to install deps. and download everything on to, will expand as soon as they've got capacity. 

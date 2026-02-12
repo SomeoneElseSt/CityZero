@@ -16,8 +16,8 @@ import multiprocessing
 from glob import glob
 
 
-def run_command(cmd: list[str], error_msg: str, cwd: Path | None = None, env: dict | None = None, 
-                capture_output: bool = True, text: bool = True, shell: bool = False,
+def run_command(cmd: list[str], error_msg: str, cwd: Path | None = None, env: dict | None = None,
+                capture_output: bool = False, text: bool = True, shell: bool = False,
                 continue_on_error: bool = False) -> subprocess.CompletedProcess:
     """
     Run a command and handle errors consistently.
@@ -113,8 +113,8 @@ def install_dependencies() -> None:
     run_command(["sudo", "apt", "update"], "Failed to update apt package list", env=env)
 
     print("Resolving package conflicts...")
-    subprocess.run(["sudo", "apt", "remove", "-y", "ucx", "libucx0"], env=env, capture_output=True)
-    subprocess.run(["sudo", "apt", "upgrade", "-y"], env=env, capture_output=True)
+    subprocess.run(["sudo", "apt", "remove", "-y", "ucx", "libucx0"], env=env)
+    subprocess.run(["sudo", "apt", "upgrade", "-y"], env=env)
 
     print("Installing dependencies...")
     cmd = ["sudo", "apt", "install", "-y"] + packages
@@ -178,14 +178,12 @@ def build_ceres_cpu_optimized() -> None:
     num_cores = multiprocessing.cpu_count()
     build_cmd = ["ninja", "-j", str(num_cores)]
     start_time = datetime.now()
-    
-    result = subprocess.run(build_cmd, cwd=build_dir, capture_output=True, text=True)
+
+    result = subprocess.run(build_cmd, cwd=build_dir)
     duration = (datetime.now() - start_time).total_seconds()
-    
+
     if result.returncode != 0:
         print(f"ERROR: Build failed after {duration:.1f} seconds (exit code: {result.returncode})")
-        if result.stderr:
-            print(result.stderr)
         sys.exit(1)
     
     print(f"Ceres Solver built successfully in {duration/60:.1f} minutes")
@@ -238,13 +236,11 @@ def build_colmap_from_source() -> None:
     build_cmd = ["ninja", "-j", str(num_cores)]
     start_time = datetime.now()
 
-    result = subprocess.run(build_cmd, cwd=build_dir, capture_output=True, text=True)
+    result = subprocess.run(build_cmd, cwd=build_dir)
     duration = (datetime.now() - start_time).total_seconds()
 
     if result.returncode != 0:
         print(f"ERROR: Build failed after {duration:.1f} seconds (exit code: {result.returncode})")
-        if result.stderr:
-            print(result.stderr)
         sys.exit(1)
 
     print(f"COLMAP built successfully in {duration/60:.1f} minutes")
