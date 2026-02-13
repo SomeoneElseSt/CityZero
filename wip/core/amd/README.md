@@ -10,13 +10,19 @@ This will ask for a password stored locally under the wip folder.
 Once authenticated, scp ```build_colmap_amd.py```:
 
 ```
-scp -i amd.pem build_colmap_amd.py ubuntu@<your-ip>:/home/
+scp -i amd.pem core/build_colmap_amd.py root@<your-ip>:/home/
+```
+
+or if on a multi-GPU AMD system: 
+```
+scp -i amd.pem build_colmap_multi_gpu_amd.py root@<your-ip>:/home/
+
 ```
 
 and ```mapper_tuned_amd.py```:
 
 ```
-scp -i amd.pem mapper_tuned_amd.py ubuntu@<your-ip>:/home/
+scp -i amd.pem core/mapper_tuned_amd.py rootu@<your-ip>:/home/
 ```
 
 This will also ask for a password. 
@@ -26,8 +32,14 @@ To download the database and images, configure rclone and download the ```images
 1. Download images:
 
 ```
-rclone copy b2:cityzero-sf-backup/images ./images --transfers 32 --checkers 64 --fast-list --buffer-size 64M -P
+rclone copy b2:cityzero-sf-backup/images_tar/images.tar ./images --fast-list --buffer-size 2046M -P --multi-thread-streams 8
 ```
+
+and decompress them: 
+```
+tar -xvf images.tar --strip-components 1 
+```
+
 
 2. Download mapper_db:
 ```

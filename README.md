@@ -315,3 +315,13 @@ Update #2: Got the credits, but they're out of capacity for the 8x clusters. Wil
 Update #3: Got a single Cluster to install deps. and download everything on to, will expand as soon as they've got capacity. 
 
 Update #4: I found out that a single GPU can't have other GPUs added to it, and given no 8x clusters are available, I'll shut it off and try again tomorrow. Starting a new one was helpful though. Got to refine some commands, also made a .tar backup of the images because it was taking almost ~1hr30min to download everything. The .tar should make it much faster.
+
+**February 13, 2026**
+
+Just woke up, had to wait for a bit until a 8x cluster was available, just snatched one. I've 6hrs to test my hypothesis from yesterday.
+
+Compressing the images into  .tar helped -- download time went from 1hr30mins to 6mins + 10mins for decompression. 
+
+I'm starting the run at 7:24.
+
+
