@@ -35,8 +35,9 @@ class ImageDownloader:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Metadata file to track downloads
-        self.metadata_file = self.output_dir / "download_metadata.json"
+        # Metadata files
+        self.metadata_file = self.output_dir / "download_metadata.json"  # Download progress tracking
+        self.images_metadata_file = self.output_dir / "images_metadata.json"  # Full image data (GPS, etc.)
     
     def get_downloaded_image_ids(self) -> Set[str]:
         """Get set of already downloaded image IDs.
@@ -61,7 +62,7 @@ class ImageDownloader:
     
     def save_metadata(self, downloaded_ids: Set[str], total_found: int):
         """Save download metadata to track progress.
-        
+
         Args:
             downloaded_ids: Set of successfully downloaded image IDs
             total_found: Total number of images discovered
@@ -71,9 +72,55 @@ class ImageDownloader:
             'total_downloaded': len(downloaded_ids),
             'downloaded_ids': list(downloaded_ids)
         }
-        
+
         with open(self.metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
+
+    def save_images_metadata(self, images: List[Dict]):
+        """Save full metadata for downloaded images (GPS coords, timestamps, etc).
+
+        Saves all images to a single images_metadata.json file as a JSON array.
+
+        Args:
+            images: List of image metadata dictionaries from API
+        """
+        # Extract metadata for each image, safely handling missing fields
+        metadata_list = []
+        for img in images:
+            if not img.get('id'):
+                continue
+
+            # Parse geometry (GeoJSON Point format)
+            geometry = img.get('geometry', {})
+            coords = geometry.get('coordinates', []) if geometry else []
+
+            # Build metadata entry with safe extraction
+            entry = {
+                'id': img.get('id'),
+                'longitude': coords[0] if len(coords) > 0 else None,
+                'latitude': coords[1] if len(coords) > 1 else None,
+                'captured_at': img.get('captured_at'),
+                'compass_angle': img.get('compass_angle'),
+                'sequence': img.get('sequence'),
+                'is_pano': img.get('is_pano'),
+            }
+
+            # Add optional fields if present
+            if 'altitude' in img:
+                entry['altitude'] = img['altitude']
+            if 'camera_type' in img:
+                entry['camera_type'] = img['camera_type']
+            if 'creator' in img:
+                entry['creator'] = img['creator']
+            if 'height' in img:
+                entry['image_height'] = img['height']
+            if 'width' in img:
+                entry['image_width'] = img['width']
+
+            metadata_list.append(entry)
+
+        with open(self.images_metadata_file, 'w') as f:
+            json.dump(metadata_list, f, indent=2)
     
     def split_bbox_into_grid(self, bbox: BoundingBox) -> List[BoundingBox]:
         """Split large bounding box into smaller grid cells.
@@ -227,8 +274,9 @@ class ImageDownloader:
                 if success_count % self.SAVE_INTERVAL == 0:
                     self.save_metadata(downloaded_ids, len(all_images))
         
-        # Final metadata save
+        # Final metadata saves
         self.save_metadata(downloaded_ids, len(all_images))
+        self.save_images_metadata(all_images)
         
         # Print summary
         print("\n" + "="*70)

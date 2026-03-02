@@ -1,6 +1,5 @@
-"""Mapillary API client for fetching street view imagery."""
+"""Mapillary API client for fetching and downloading street view imagery."""
 
-import json
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -54,7 +53,9 @@ class MapillaryClient:
         params = {
             "bbox": f"{bbox.west},{bbox.south},{bbox.east},{bbox.north}",
             "limit": limit,
-            "fields": "id,geometry,captured_at,compass_angle,sequence,is_pano"
+            # Core fields: always available
+            # Optional fields: altitude, camera_type, creator, height, width (if present in API)
+            "fields": "id,geometry,captured_at,compass_angle,sequence,is_pano,altitude,camera_type,creator,height,width"
         }
         
         if start_time:
@@ -131,29 +132,6 @@ class MapillaryClient:
                 f.write(chunk)
         
         return True
-    
-    def save_image_metadata(
-        self,
-        images: List[Dict],
-        output_path: Path
-    ) -> bool:
-        """Save image metadata to JSON file.
-        
-        Args:
-            images: List of image metadata dictionaries
-            output_path: Path to save the JSON file
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        try:
-            with open(output_path, "w") as f:
-                json.dump(images, f, indent=2)
-            return True
-        except Exception:
-            return False
     
     def get_coverage_stats(self, bbox: BoundingBox) -> Dict:
         """Get statistics about image coverage in a bounding box.
