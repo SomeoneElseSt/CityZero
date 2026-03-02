@@ -16,27 +16,13 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 # Data directories
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
-PROCESSED_DATA_DIR = DATA_DIR / "processed"
-MAPS_DATA_DIR = DATA_DIR / "maps"
-
-# Output directories
-OUTPUT_DIR = PROJECT_ROOT / "local_tests" / "outputs"
-MODELS_OUTPUT_DIR = OUTPUT_DIR / "models"
-RENDERS_OUTPUT_DIR = OUTPUT_DIR / "renders"
 
 
 @dataclass
 class MapillaryConfig:
     """Mapillary API configuration."""
-    
+
     client_token: str
-    
-    def __post_init__(self):
-        if not self.client_token or self.client_token == "your_mapillary_token_here":
-            raise ValueError(
-                "MAPILLARY_CLIENT_TOKEN not set. "
-                "Please copy .env.example to .env and add your token."
-            )
 
 
 @dataclass
@@ -49,27 +35,26 @@ class BoundingBox:
     north: float
     
     @classmethod
-    def from_string(cls, bbox_string: str) -> "BoundingBox":
-        """Parse bounding box from comma-separated string."""
+    def from_string(cls, bbox_string: str) -> "BoundingBox | None":
+        """Parse bounding box from comma-separated string, or None if invalid."""
         parts = bbox_string.split(",")
         if len(parts) != 4:
-            raise ValueError(f"Invalid bbox format: {bbox_string}")
-        
-        return cls(
-            west=float(parts[0]),
-            south=float(parts[1]),
-            east=float(parts[2]),
-            north=float(parts[3])
-        )
+            return None
+        try:
+            return cls(west=float(parts[0]), south=float(parts[1]), east=float(parts[2]), north=float(parts[3]))
+        except ValueError:
+            return None
     
     def to_tuple(self) -> Tuple[float, float, float, float]:
         """Return as tuple (west, south, east, north)."""
         return (self.west, self.south, self.east, self.north)
 
 
-def get_mapillary_config() -> MapillaryConfig:
-    """Get Mapillary configuration from environment."""
+def get_mapillary_config() -> MapillaryConfig | None:
+    """Get Mapillary configuration from environment, or None if token is missing."""
     token = os.getenv("MAPILLARY_CLIENT_TOKEN", "")
+    if not token:
+        return None
     return MapillaryConfig(client_token=token)
 
 

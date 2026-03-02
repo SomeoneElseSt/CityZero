@@ -34,32 +34,6 @@ from .config import get_mapillary_config, BoundingBox, RAW_DATA_DIR, CITY_BBOXES
 from .mapillary import MapillaryClient, ImageDownloader
 
 
-def parse_bbox_string(bbox_str: str) -> BoundingBox:
-    """Parse bounding box from comma-separated string.
-
-    Args:
-        bbox_str: String in format "west,south,east,north"
-
-    Returns:
-        BoundingBox object
-    """
-    try:
-        parts = [float(x.strip()) for x in bbox_str.split(',')]
-        if len(parts) != 4:
-            raise ValueError("Bbox must have exactly 4 values")
-
-        return BoundingBox(
-            west=parts[0],
-            south=parts[1],
-            east=parts[2],
-            north=parts[3]
-        )
-    except Exception as e:
-        print(f"❌ Error parsing bbox: {e}")
-        print("   Format should be: west,south,east,north")
-        print("   Example: -122.52,37.70,-122.35,37.83")
-        sys.exit(1)
-
 
 def get_bbox_for_city(city_name: str) -> BoundingBox:
     """Get bounding box for a known city.
@@ -135,17 +109,11 @@ def show_download_summary(
     bbox: BoundingBox,
     location_name: str,
     max_images: int = None
-) -> bool:
+) -> tuple[bool, list[dict]]:
     """Discover images and show summary before download.
 
-    Args:
-        downloader: ImageDownloader instance
-        bbox: Bounding box to search
-        location_name: Name of the location
-        max_images: Optional limit on images to download
-
     Returns:
-        True if user confirms, False if cancelled
+        (confirmed, discovered_images) — confirmed is False if cancelled or nothing to download
     """
     print(f"\n📊 Analyzing {location_name}...")
 
@@ -154,7 +122,7 @@ def show_download_summary(
 
     if not all_images:
         print("❌ No images found in this area")
-        return False
+        return False, []
 
     images_to_download = [img for img in all_images if img.get('id') not in cached_ids]
 
@@ -169,14 +137,14 @@ def show_download_summary(
 
     if len(images_to_download) == 0:
         print("\n✓ All images already downloaded!")
-        return False
+        return False, []
 
     proceed = questionary.confirm(
         f"Download {len(images_to_download):,} new images?",
         default=True
     ).ask()
 
-    return proceed if proceed is not None else False
+    return bool(proceed), all_images
 
 
 def interactive_mode() -> tuple[BoundingBox, str]:
@@ -211,7 +179,10 @@ def interactive_mode() -> tuple[BoundingBox, str]:
             print("\n⚠️  No input provided. Exiting.")
             sys.exit(0)
 
-        bbox = parse_bbox_string(bbox_str)
+        bbox = BoundingBox.from_string(bbox_str)
+        if bbox is None:
+            print(f"Invalid bbox format: '{bbox_str}'. Expected: west,south,east,north")
+            sys.exit(1)
         location_name = "Custom Area"
     else:
         location_name = selected
@@ -280,7 +251,11 @@ Examples:
     if args.city or args.bbox:
         if args.bbox:
             print(f"\n📍 Using custom bounding box")
-            bbox = parse_bbox_string(args.bbox)
+            bbox = BoundingBox.from_string(args.bbox)
+            if bbox is None:
+                print(f"Invalid bbox format: '{args.bbox}'. Expected: west,south,east,north")
+                print("   Example: -122.52,37.70,-122.35,37.83")
+                sys.exit(1)
             location_name = "Custom Area"
         else:
             print(f"\n📍 Location: {args.city}")
@@ -305,10 +280,9 @@ Examples:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output: {args.output_dir}")
 
-    try:
-        config = get_mapillary_config()
-    except ValueError as e:
-        print(f"\n❌ Configuration Error: {e}")
+    config = get_mapillary_config()
+    if config is None:
+        print("\n❌ MAPILLARY_CLIENT_TOKEN not set.")
         print("\nPlease ensure:")
         print("1. .env file exists in project root")
         print("2. MAPILLARY_CLIENT_TOKEN is set correctly")
@@ -318,12 +292,13 @@ Examples:
     client = MapillaryClient(config)
     downloader = ImageDownloader(client, output_dir=args.output_dir)
 
-    if not show_download_summary(downloader, bbox, location_name, args.limit):
+    confirmed, discovered_images = show_download_summary(downloader, bbox, location_name, args.limit)
+    if not confirmed:
         print("\n⚠️  Download cancelled by user.")
         sys.exit(0)
 
     try:
-        stats = downloader.download_images(bbox=bbox, max_images=args.limit)
+        stats = downloader.download_images(bbox=bbox, max_images=args.limit, images=discovered_images)
 
         if stats['failed'] > 0:
             sys.exit(1)

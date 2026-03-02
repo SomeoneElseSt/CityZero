@@ -15,6 +15,14 @@ MAX_RESOLUTION = 2048
 GRID_CELL_SIZE = 0.01
 SAVE_INTERVAL = 10
 
+OPTIONAL_FIELDS = {
+    'altitude': 'altitude',
+    'camera_type': 'camera_type',
+    'creator': 'creator',
+    'height': 'image_height',
+    'width': 'image_width',
+}
+
 
 class MapillaryClient:
     """Client for interacting with Mapillary API."""
@@ -160,16 +168,7 @@ class ImageDownloader:
                 'is_pano': img.get('is_pano'),
             }
 
-            if 'altitude' in img:
-                entry['altitude'] = img['altitude']
-            if 'camera_type' in img:
-                entry['camera_type'] = img['camera_type']
-            if 'creator' in img:
-                entry['creator'] = img['creator']
-            if 'height' in img:
-                entry['image_height'] = img['height']
-            if 'width' in img:
-                entry['image_width'] = img['width']
+            entry.update({dst: img[src] for src, dst in OPTIONAL_FIELDS.items() if src in img})
 
             metadata_list.append(entry)
 
@@ -220,8 +219,8 @@ class ImageDownloader:
         print(f"\n✓ Found {len(all_images)} unique images")
         return all_images
 
-    def download_images(self, bbox: BoundingBox, max_images: int = None) -> Dict[str, int]:
-        """Download all images in bounding box."""
+    def download_images(self, bbox: BoundingBox, max_images: int = None, images: List[Dict] = None) -> Dict[str, int]:
+        """Download all images in bounding box. Pass `images` to skip rediscovery."""
         print("\n" + "="*70)
         print("CityZero Image Downloader")
         print("="*70)
@@ -231,7 +230,7 @@ class ImageDownloader:
             print(f"\n📂 Found {len(downloaded_ids)} already downloaded images")
             print("   (Will skip these to resume download)")
 
-        all_images = self.discover_images(bbox)
+        all_images = images if images is not None else self.discover_images(bbox)
 
         if not all_images:
             print("\n❌ No images found in this area")
