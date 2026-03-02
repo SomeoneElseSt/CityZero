@@ -3,22 +3,22 @@
 
 Usage:
     # Interactive mode (no arguments)
-    uv run python -m cityzero.mapillary_downloader
+    uv run python -m cityzero.cli
 
     # Non-interactive: specify city by name
-    uv run python -m cityzero.mapillary_downloader --city "New York"
+    uv run python -m cityzero.cli --city "New York"
 
     # Non-interactive: custom bounding box
-    uv run python -m cityzero.mapillary_downloader --bbox "-122.52,37.70,-122.35,37.83"
+    uv run python -m cityzero.cli --bbox "-122.52,37.70,-122.35,37.83"
 
     # With image limit (for testing)
-    uv run python -m cityzero.mapillary_downloader --city "San Francisco" --limit 100
+    uv run python -m cityzero.cli --city "San Francisco" --limit 100
 
     # Resume interrupted download
-    uv run python -m cityzero.mapillary_downloader --city "San Francisco"  # auto-resumes
+    uv run python -m cityzero.cli --city "San Francisco"  # auto-resumes
 
     # Show available cities
-    uv run python -m cityzero.mapillary_downloader --list-cities
+    uv run python -m cityzero.cli --list-cities
 """
 
 import argparse
@@ -31,8 +31,7 @@ import folium
 import questionary
 
 from .config import get_mapillary_config, BoundingBox, RAW_DATA_DIR, CITY_BBOXES
-from .downloader import ImageDownloader
-from .mapillary_client import MapillaryClient
+from .mapillary import MapillaryClient, ImageDownloader
 
 
 def parse_bbox_string(bbox_str: str) -> BoundingBox:
@@ -94,24 +93,21 @@ def generate_map_preview(bbox: BoundingBox, location_name: str) -> str:
     Returns:
         Path to the generated HTML file
     """
-    # Calculate center of bbox
     center_lat = (bbox.south + bbox.north) / 2
     center_lon = (bbox.west + bbox.east) / 2
 
-    # Create map centered on bbox
     m = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=12,
         tiles="OpenStreetMap"
     )
 
-    # Draw bbox as a red rectangle
     bbox_coords = [
         [bbox.south, bbox.west],
         [bbox.south, bbox.east],
         [bbox.north, bbox.east],
         [bbox.north, bbox.west],
-        [bbox.south, bbox.west],  # Close the rectangle
+        [bbox.south, bbox.west],
     ]
 
     folium.PolyLine(
@@ -122,14 +118,12 @@ def generate_map_preview(bbox: BoundingBox, location_name: str) -> str:
         popup=f"Download Area: {location_name}"
     ).add_to(m)
 
-    # Add a marker at the center
     folium.Marker(
         location=[center_lat, center_lon],
         popup=f"Center of {location_name}",
         tooltip="Download area center"
     ).add_to(m)
 
-    # Save to temp file
     temp_file = Path(tempfile.gettempdir()) / "cityzero_preview.html"
     m.save(str(temp_file))
 
@@ -155,27 +149,18 @@ def show_download_summary(
     """
     print(f"\n📊 Analyzing {location_name}...")
 
-    # Get cached images
     cached_ids = downloader.get_downloaded_image_ids()
-
-    # Discover available images
     all_images = downloader.discover_images(bbox)
 
     if not all_images:
         print("❌ No images found in this area")
         return False
 
-    # Calculate new images to download
-    images_to_download = [
-        img for img in all_images
-        if img.get('id') not in cached_ids
-    ]
+    images_to_download = [img for img in all_images if img.get('id') not in cached_ids]
 
-    # Apply max_images limit
     if max_images and len(images_to_download) > max_images:
         images_to_download = images_to_download[:max_images]
 
-    # Show summary
     print("\n📋 Summary:")
     print(f"  Location:        {location_name}")
     print(f"  Total found:     {len(all_images):,}")
@@ -186,7 +171,6 @@ def show_download_summary(
         print("\n✓ All images already downloaded!")
         return False
 
-    # Final confirmation
     proceed = questionary.confirm(
         f"Download {len(images_to_download):,} new images?",
         default=True
@@ -205,11 +189,9 @@ def interactive_mode() -> tuple[BoundingBox, str]:
     print("🗺️ CityZero Image Downloader")
     print("="*70)
 
-    # Prepare city choices (capitalize city names nicely)
     city_choices = [city.title() for city in sorted(CITY_BBOXES.keys())]
     city_choices.append("Custom bounding box...")
 
-    # Interactive selection
     selected = questionary.select(
         "Select a city or custom area:",
         choices=city_choices
@@ -220,7 +202,6 @@ def interactive_mode() -> tuple[BoundingBox, str]:
         sys.exit(0)
 
     if selected == "Custom bounding box...":
-        # Prompt for custom bbox
         bbox_str = questionary.text(
             "Enter bounding box (west,south,east,north):",
             default="-122.52,37.70,-122.35,37.83"
@@ -233,17 +214,14 @@ def interactive_mode() -> tuple[BoundingBox, str]:
         bbox = parse_bbox_string(bbox_str)
         location_name = "Custom Area"
     else:
-        # Selected a predefined city
         location_name = selected
         bbox = get_bbox_for_city(selected)
 
-    # Show map preview
     print(f"\n📍 Generating map preview for {location_name}...")
     map_file = generate_map_preview(bbox, location_name)
     print(f"   Opening in browser: {map_file}")
     webbrowser.open(f"file://{map_file}")
 
-    # Confirmation prompt
     proceed = questionary.confirm(
         "Proceed with preview?",
         default=True
@@ -264,65 +242,34 @@ def main():
         epilog="""
 Examples:
   Interactive mode (recommended):
-    uv run python -m cityzero.mapillary_downloader
+    uv run python -m cityzero.cli
 
   Non-interactive: specify city by name:
-    uv run python -m cityzero.mapillary_downloader --city "New York"
+    uv run python -m cityzero.cli --city "New York"
 
   Non-interactive: custom bounding box:
-    uv run python -m cityzero.mapillary_downloader --bbox "-74.05,40.68,-73.91,40.88"
+    uv run python -m cityzero.cli --bbox "-74.05,40.68,-73.91,40.88"
 
   Limit download for testing:
-    uv run python -m cityzero.mapillary_downloader --city "San Francisco" --limit 50
+    uv run python -m cityzero.cli --city "San Francisco" --limit 50
 
   Specify output directory:
-    uv run python -m cityzero.mapillary_downloader --output-dir data/sf_images
+    uv run python -m cityzero.cli --output-dir data/sf_images
 
   Show available cities:
-    uv run python -m cityzero.mapillary_downloader --list-cities
+    uv run python -m cityzero.cli --list-cities
         """
     )
 
-    parser.add_argument(
-        '--city',
-        type=str,
-        help='City name (enables non-interactive mode)'
-    )
-
-    parser.add_argument(
-        '--bbox',
-        type=str,
-        help='Custom bounding box as "west,south,east,north" (overrides --city)'
-    )
-
-    parser.add_argument(
-        '--limit',
-        type=int,
-        help='Maximum number of images to download (useful for testing)'
-    )
-
-    parser.add_argument(
-        '--output-dir',
-        type=Path,
-        default=None,
-        help=f'Output directory for images (default: {RAW_DATA_DIR}/<city>)'
-    )
-
-    parser.add_argument(
-        '--list-cities',
-        action='store_true',
-        help='List available predefined cities and exit'
-    )
-
-    parser.add_argument(
-        '--preview',
-        action='store_true',
-        help='Show map preview before downloading (non-interactive mode only)'
-    )
+    parser.add_argument('--city', type=str, help='City name (enables non-interactive mode)')
+    parser.add_argument('--bbox', type=str, help='Custom bounding box as "west,south,east,north" (overrides --city)')
+    parser.add_argument('--limit', type=int, help='Maximum number of images to download (useful for testing)')
+    parser.add_argument('--output-dir', type=Path, default=None, help=f'Output directory for images (default: {RAW_DATA_DIR}/<city>)')
+    parser.add_argument('--list-cities', action='store_true', help='List available predefined cities and exit')
+    parser.add_argument('--preview', action='store_true', help='Show map preview before downloading (non-interactive mode only)')
 
     args = parser.parse_args()
 
-    # Handle --list-cities
     if args.list_cities:
         print("\n📍 Available cities:")
         for city in sorted(CITY_BBOXES.keys()):
@@ -330,9 +277,7 @@ Examples:
             print(f"  {city.title():20} {bbox.to_tuple()}")
         return
 
-    # Determine if interactive or non-interactive mode
     if args.city or args.bbox:
-        # Non-interactive mode (flag-based)
         if args.bbox:
             print(f"\n📍 Using custom bounding box")
             bbox = parse_bbox_string(args.bbox)
@@ -342,7 +287,6 @@ Examples:
             bbox = get_bbox_for_city(args.city)
             location_name = args.city
 
-        # Show preview if requested
         if args.preview:
             print(f"\n📍 Generating map preview...")
             map_file = generate_map_preview(bbox, location_name)
@@ -350,23 +294,17 @@ Examples:
             webbrowser.open(f"file://{map_file}")
             input("\nPress Enter to continue...")
     else:
-        # Interactive mode (default when no flags)
         bbox, location_name = interactive_mode()
 
-    # Determine output directory
     if args.output_dir is None:
-        # Use default with city subdir (unless custom area)
         if location_name == "Custom Area":
             args.output_dir = RAW_DATA_DIR
         else:
             args.output_dir = RAW_DATA_DIR / location_name
-    # else: user explicitly specified --output-dir, use it as-is
 
-    # Create output directory if it doesn't exist
     args.output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output: {args.output_dir}")
 
-    # Initialize Mapillary client
     try:
         config = get_mapillary_config()
     except ValueError as e:
@@ -378,27 +316,19 @@ Examples:
         sys.exit(1)
 
     client = MapillaryClient(config)
-
-    # Initialize downloader
     downloader = ImageDownloader(client, output_dir=args.output_dir)
 
-    # Show summary and get final confirmation
     if not show_download_summary(downloader, bbox, location_name, args.limit):
         print("\n⚠️  Download cancelled by user.")
         sys.exit(0)
 
-    # Download images
     try:
-        stats = downloader.download_images(
-            bbox=bbox,
-            max_images=args.limit
-        )
+        stats = downloader.download_images(bbox=bbox, max_images=args.limit)
 
-        # Exit with appropriate code
         if stats['failed'] > 0:
-            sys.exit(1)  # Some failures occurred
+            sys.exit(1)
         else:
-            sys.exit(0)  # Success
+            sys.exit(0)
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Download interrupted by user")
