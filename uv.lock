@@ -99,7 +99,7 @@ wheels = [
 [[package]]
 name = "cityzero"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "folium" },
     { name = "mapillary" },
