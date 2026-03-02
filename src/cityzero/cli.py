@@ -3,22 +3,22 @@
 
 Usage:
     # Interactive mode (no arguments)
-    uv run python -m cityzero.cli
+    uv run python3 cli.py
 
     # Non-interactive: specify city by name
-    uv run python -m cityzero.cli --city "New York"
+    uv run python3 cli.py --city "New York"
 
     # Non-interactive: custom bounding box
-    uv run python -m cityzero.cli --bbox "-122.52,37.70,-122.35,37.83"
+    uv run python3 cli.py --bbox "-122.52,37.70,-122.35,37.83"
 
     # With image limit (for testing)
-    uv run python -m cityzero.cli --city "San Francisco" --limit 100
+    uv run python3 cli.py --city "San Francisco" --limit 100
 
     # Resume interrupted download
-    uv run python -m cityzero.cli --city "San Francisco"  # auto-resumes
+    uv run python3 cli.py --city "San Francisco"  # auto-resumes
 
     # Show available cities
-    uv run python -m cityzero.cli --list-cities
+    uv run python3 cli.py --list-cities
 """
 
 import argparse
@@ -30,8 +30,8 @@ from pathlib import Path
 import folium
 import questionary
 
-from .config import get_mapillary_config, BoundingBox, RAW_DATA_DIR, CITY_BBOXES
-from .mapillary import MapillaryClient, ImageDownloader
+from config import get_mapillary_config, BoundingBox, RAW_DATA_DIR, CITY_BBOXES
+from client import MapillaryClient, ImageDownloader
 
 
 
@@ -213,22 +213,22 @@ def main():
         epilog="""
 Examples:
   Interactive mode (recommended):
-    uv run python -m cityzero.cli
+    uv run python3 cli.py
 
   Non-interactive: specify city by name:
-    uv run python -m cityzero.cli --city "New York"
+    uv run python3 cli.py --city "New York"
 
   Non-interactive: custom bounding box:
-    uv run python -m cityzero.cli --bbox "-74.05,40.68,-73.91,40.88"
+    uv run python3 cli.py --bbox "-74.05,40.68,-73.91,40.88"
 
   Limit download for testing:
-    uv run python -m cityzero.cli --city "San Francisco" --limit 50
+    uv run python3 cli.py --city "San Francisco" --limit 50
 
   Specify output directory:
-    uv run python -m cityzero.cli --output-dir data/sf_images
+    uv run python3 cli.py --output-dir data/sf_images
 
   Show available cities:
-    uv run python -m cityzero.cli --list-cities
+    uv run python3 cli.py --list-cities
         """
     )
 

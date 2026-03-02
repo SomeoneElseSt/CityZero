@@ -8,7 +8,7 @@ import mapillary.interface as mly
 import requests
 from tqdm import tqdm
 
-from cityzero.config import BoundingBox, MapillaryConfig, RAW_DATA_DIR
+from config import BoundingBox, MapillaryConfig, RAW_DATA_DIR
 
 
 MAX_RESOLUTION = 2048
