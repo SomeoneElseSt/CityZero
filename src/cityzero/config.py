@@ -73,7 +73,36 @@ def get_mapillary_config() -> MapillaryConfig:
     return MapillaryConfig(client_token=token)
 
 
-def get_sf_bbox() -> BoundingBox:
-    """Get San Francisco bounding box from environment or use default."""
-    bbox_string = os.getenv("SF_BBOX", "-122.5147,37.7034,-122.3549,37.8324")
-    return BoundingBox.from_string(bbox_string)
+# Predefined city bounding boxes (can be extended)
+CITY_BBOXES: dict[str, BoundingBox] = {
+    "san francisco": BoundingBox(
+        west=-122.5147,
+        south=37.7034,
+        east=-122.3549,
+        north=37.8324
+    ),
+    "new york": BoundingBox(
+        west=-74.0479,
+        south=40.6829,
+        east=-73.9067,
+        north=40.8820
+    ),
+    "los angeles": BoundingBox(
+        west=-118.6682,
+        south=33.7037,
+        east=-118.1553,
+        north=34.3373
+    ),
+    "chicago": BoundingBox(
+        west=-87.9401,
+        south=41.6444,
+        east=-87.5241,
+        north=42.0230
+    ),
+    "miami": BoundingBox(
+        west=-80.3203,
+        south=25.7090,
+        east=-80.1300,
+        north=25.8554
+    ),
+}
