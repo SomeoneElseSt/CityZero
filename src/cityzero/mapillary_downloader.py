@@ -304,8 +304,8 @@ Examples:
     parser.add_argument(
         '--output-dir',
         type=Path,
-        default=RAW_DATA_DIR,
-        help=f'Output directory for images (default: {RAW_DATA_DIR})'
+        default=None,
+        help=f'Output directory for images (default: {RAW_DATA_DIR}/<city>)'
     )
 
     parser.add_argument(
@@ -352,6 +352,19 @@ Examples:
     else:
         # Interactive mode (default when no flags)
         bbox, location_name = interactive_mode()
+
+    # Determine output directory
+    if args.output_dir is None:
+        # Use default with city subdir (unless custom area)
+        if location_name == "Custom Area":
+            args.output_dir = RAW_DATA_DIR
+        else:
+            args.output_dir = RAW_DATA_DIR / location_name
+    # else: user explicitly specified --output-dir, use it as-is
+
+    # Create output directory if it doesn't exist
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"📁 Output: {args.output_dir}")
 
     # Initialize Mapillary client
     try:
