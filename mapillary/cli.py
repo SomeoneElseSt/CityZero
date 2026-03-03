@@ -28,6 +28,7 @@ import webbrowser
 from pathlib import Path
 
 import folium
+import folium.plugins
 import questionary
 
 from config import get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES
@@ -56,8 +57,6 @@ def get_bbox_for_city(city_name: str) -> BoundingBox:
     print("\nPlease use --bbox to specify custom coordinates.")
     sys.exit(1)
 
-
-MAX_MAP_SCATTER_POINTS = 5000
 
 
 def generate_map_preview(bbox: BoundingBox, location_name: str, images: list[dict] | None = None) -> str:
@@ -103,26 +102,14 @@ def generate_map_preview(bbox: BoundingBox, location_name: str, images: list[dic
     ).add_to(m)
 
     if images:
-        sampled = images
-        if len(images) > MAX_MAP_SCATTER_POINTS:
-            import random
-            sampled = random.sample(images, MAX_MAP_SCATTER_POINTS)
-            print(f"   (Showing {MAX_MAP_SCATTER_POINTS:,} of {len(images):,} points for browser performance)")
-
-        for img in sampled:
+        heat_coords = []
+        for img in images:
             coords = img.get('geometry', {}).get('coordinates', [])
-            if len(coords) < 2:
-                continue
-            lon, lat = coords[0], coords[1]
-            folium.CircleMarker(
-                location=[lat, lon],
-                radius=2,
-                color="blue",
-                fill=True,
-                fill_color="blue",
-                fill_opacity=0.5,
-                opacity=0.5,
-            ).add_to(m)
+            if len(coords) >= 2:
+                heat_coords.append([coords[1], coords[0]])
+
+        if heat_coords:
+            folium.plugins.HeatMap(heat_coords, radius=8, blur=10, min_opacity=0.3).add_to(m)
 
     temp_file = Path(tempfile.gettempdir()) / "cityzero_preview.html"
     m.save(str(temp_file))
