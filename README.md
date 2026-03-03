@@ -7,13 +7,13 @@ To create realistic city replicas that can be used to simulate traffic, pedestri
 # How?
 As of now: upload N images to a Lambda Cloud instance. There, use COLMAP with CUDA support to feature match images and solve for camera positions  (assumes Mapillary does not provide camera positions in advance). The binaries with camera models, poses, and 3D points are passed through Brush on Mac using Gaussian Splatting. A .ply file with the final positions and covariances is made that can be visualized in 3D with Brush also. See below some output examples from a 15k iterations run on images of Chinatown, San Francisco.
 
-![v.01 - 15k iterations - Image 1](./assets/sf_findi_run/v_0.1_15k_image_1.png)
+![v.01 - 15k iterations - Image 1](./assets/sf-findi-run/v-0.1-15k-image-1.png)
 
-![v.01 - 15k iterations - Image 2](./assets/sf_findi_run/v_0.1_15k_image_2.png)      
+![v.01 - 15k iterations - Image 2](./assets/sf-findi-run/v-0.1-15k-image-2.png)
 
 Later I trained a 30k iteration version too that made some interesting internal mini-representations of parts of the training images, like the Transamerica pyramid shown below in a small set of clustered gaussians.
 
-![v.01 - 30k iterations - Image 1](./assets/sf_findi_run/v_0.1_30k_image_1.png)
+![v.01 - 30k iterations - Image 1](./assets/sf-findi-run/v-0.1-30k-image-1.png)
 
 
 ---
@@ -28,7 +28,7 @@ Logically, it's redundant to, for example, compare an image in the south of a ci
 
 So I'm working on using geofencing and clustering to make this work. I had to wait another week for Mapillary's API to fetch the latitude/longitude of each image I had downloaded before, and while running some tests, I ran into something interesting (if not catastrophic):
 
-![Scatter Plot showing the coordinates for each downloaded image in the dataset](./assets/scatter_plots/sf_scatter.png)
+![Scatter Plot showing the coordinates for each downloaded image in the dataset](./assets/scatter-plots/sf-scatter.png)
 
 For whatever reason, my initial downloading algorithm didn't get all the images of the city. It missed a huge chunk of the Financial District and only caught mini-clusters within. 
 
@@ -42,7 +42,7 @@ Now I'll have to change some things so the experiments work on the Sunset, but a
 
 I've now made a new set of boxes of the Sunset District based on what I found yesterday. They seem promising!
 
-![Scatter Plot showing images within the Sunset District segmentation boxes](./assets/scatter_plots/sunset_scatter.png)
+![Scatter Plot showing images within the Sunset District segmentation boxes](./assets/scatter-plots/sunset-scatter.png)
 
 **January 19, 2026**
 
