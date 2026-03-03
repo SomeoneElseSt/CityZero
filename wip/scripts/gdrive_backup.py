@@ -1,5 +1,5 @@
 """
-I gathered 575_450 images of San Francisco under .data/raw from Mapillary.
+I gathered 575_450 images of San Francisco under .data from Mapillary.
 
 This script backs them up to a Google Drive directory using the Google Drive API. 
 
@@ -35,7 +35,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 MAX_UPLOAD_RETRIES = 5
 
 # Source directory
-SOURCE_DIR = "../../data/raw"
+SOURCE_DIR = "../../data"
 
 # Tracking file
 TRACKING_FILE = "uploaded_images.json"

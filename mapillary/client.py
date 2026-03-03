@@ -8,7 +8,7 @@ import mapillary.interface as mly
 import requests
 from tqdm import tqdm
 
-from config import BoundingBox, MapillaryConfig, RAW_DATA_DIR
+from config import BoundingBox, MapillaryConfig, DATA_DIR
 
 
 MAX_RESOLUTION = 2048
@@ -117,7 +117,7 @@ class MapillaryClient:
 class ImageDownloader:
     """Downloads Mapillary images with progress tracking."""
 
-    def __init__(self, client: MapillaryClient, output_dir: Path = RAW_DATA_DIR):
+    def __init__(self, client: MapillaryClient, output_dir: Path = DATA_DIR):
         self.client = client
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)

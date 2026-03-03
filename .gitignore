@@ -33,6 +33,7 @@ data/maps/*
 !data/processed/.gitkeep
 !data/maps/.gitkeep
 wip/db_info/
+wip/segmentation_experiments/query_expansion_pairs/
 
 # Outputs
 outputs/models/*

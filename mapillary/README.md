@@ -23,9 +23,9 @@ uv run python3 cli.py --help
 
 ## Output
 
-Images saved to: `data/raw/{city}/{image_id}.jpg`
-Download progress: `data/raw/{city}/download_metadata.json`
-Image metadata (GPS, timestamps): `data/raw/{city}/images_metadata.json`
+Images saved to: `data/{city}/{image_id}.jpg`
+Download progress: `data/{city}/download_metadata.json`
+Image metadata (GPS, timestamps): `data/{city}/images_metadata.json`
 
 ## Resume Behavior
 

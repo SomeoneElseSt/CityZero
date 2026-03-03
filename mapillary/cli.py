@@ -30,7 +30,7 @@ from pathlib import Path
 import folium
 import questionary
 
-from config import get_mapillary_config, BoundingBox, RAW_DATA_DIR, CITY_BBOXES
+from config import get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES
 from client import MapillaryClient, ImageDownloader
 
 
@@ -235,7 +235,7 @@ Examples:
     parser.add_argument('--city', type=str, help='City name (enables non-interactive mode)')
     parser.add_argument('--bbox', type=str, help='Custom bounding box as "west,south,east,north" (overrides --city)')
     parser.add_argument('--limit', type=int, help='Maximum number of images to download (useful for testing)')
-    parser.add_argument('--output-dir', type=Path, default=None, help=f'Output directory for images (default: {RAW_DATA_DIR}/<city>)')
+    parser.add_argument('--output-dir', type=Path, default=None, help=f'Output directory for images (default: {DATA_DIR}/<city>)')
     parser.add_argument('--list-cities', action='store_true', help='List available predefined cities and exit')
     parser.add_argument('--preview', action='store_true', help='Show map preview before downloading (non-interactive mode only)')
 
@@ -273,9 +273,9 @@ Examples:
 
     if args.output_dir is None:
         if location_name == "Custom Area":
-            args.output_dir = RAW_DATA_DIR
+            args.output_dir = DATA_DIR
         else:
-            args.output_dir = RAW_DATA_DIR / location_name
+            args.output_dir = DATA_DIR / location_name
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output: {args.output_dir}")

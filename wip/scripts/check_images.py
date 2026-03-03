@@ -6,7 +6,7 @@ def main():
     # Configuration based on user description
     # Run from cityzero-sf root
     GEODATA_DIR = "data/geodata"
-    RAW_DIR = "data/raw"
+    RAW_DIR = "data"
     
     # 1. Find the metadata JSON file
     if len(sys.argv) > 1:

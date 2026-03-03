@@ -1,4 +1,4 @@
-"""Configuration management for CityZero."""
+"""Configuration management for Mapillary client and CLI downloader."""
 
 import os
 from dataclasses import dataclass
@@ -13,9 +13,8 @@ load_dotenv()
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
-# Data directories
+# Data directory
 DATA_DIR = PROJECT_ROOT / "data"
-RAW_DATA_DIR = DATA_DIR / "raw"
 
 
 @dataclass
