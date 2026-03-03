@@ -1,6 +1,7 @@
 """Mapillary API client and image downloader for street view imagery."""
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
@@ -14,6 +15,7 @@ from config import BoundingBox, MapillaryConfig, DATA_DIR
 MAX_RESOLUTION = 2048
 GRID_CELL_SIZE = 0.01
 SAVE_INTERVAL = 10
+DISCOVERY_WORKERS = 30
 
 OPTIONAL_FIELDS = {
     'altitude': 'altitude',
@@ -208,13 +210,15 @@ class ImageDownloader:
         all_images = []
         seen_ids = set()
 
-        for cell in tqdm(cells, desc="Discovering", unit="cell"):
-            images = self.client.get_images_in_bbox(cell, limit=5000)
-            for img in images:
-                img_id = img.get('id')
-                if img_id and img_id not in seen_ids:
-                    all_images.append(img)
-                    seen_ids.add(img_id)
+        with ThreadPoolExecutor(max_workers=DISCOVERY_WORKERS) as executor:
+            futures = {executor.submit(self.client.get_images_in_bbox, cell, 5000): cell for cell in cells}
+            for future in tqdm(as_completed(futures), total=len(cells), desc="Discovering", unit="cell"):
+                images = future.result() or []
+                for img in images:
+                    img_id = img.get('id')
+                    if img_id and img_id not in seen_ids:
+                        all_images.append(img)
+                        seen_ids.add(img_id)
 
         print(f"\n✓ Found {len(all_images)} unique images")
         return all_images
