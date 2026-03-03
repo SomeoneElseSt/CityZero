@@ -25,8 +25,7 @@ ENV/
 # Data directories
 data/sf_geodata/*
 wip/db_info/
-wip/segmentation_experiments/query_expansion_pairs/
-wip/segmentation_experiments/experiment_two/fringes
+wip/segmentation/outputs/
 wip/binaries/
 
 # WIP data and outputs
