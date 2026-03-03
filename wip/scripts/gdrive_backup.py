@@ -38,24 +38,22 @@ MAX_UPLOAD_RETRIES = 5
 # Source directory
 SOURCE_DIR = "../../data"
 
-PRIVATE_DIR = Path(__file__).resolve().parents[1] / "private"
+PRIVATE_DIR = Path(__file__).resolve().parents[1] / "private" / "gdrive"
 
 # Tracking file
 TRACKING_FILE = PRIVATE_DIR / "uploaded_images.json"
 
-# Local book-keeping of already uploaded images to skip 
-if os.path.exists(TRACKING_FILE):
+# Local book-keeping of already uploaded images to skip
+if TRACKING_FILE.exists():
   try:
     with open(TRACKING_FILE, "r") as f:
-      uploaded_images = json.load(f).get("uploaded_images", {})
+      uploaded_images = set(json.load(f))
   except Exception:
-    uploaded_images = {}
+    uploaded_images = set()
   print(f"Tracking file found. {len(uploaded_images)} images have been uploaded and will be skipped.\n")
 else:
   print(f"Tracking file not found. Creating it...\n")
-  with open(TRACKING_FILE, "w") as f:
-    json.dump({"uploaded_images": {}}, f)
-  uploaded_images = {}
+  uploaded_images = set()
 
 def main():
   """Shows basic usage of the Drive v3 API.
@@ -126,9 +124,9 @@ def main():
             continue
 
         print(f"File {entry.name} has been uploaded. 🟢")
-        uploaded_images[entry.name] = True
+        uploaded_images.add(entry.name)
         with open(TRACKING_FILE, "w") as f:
-            json.dump({"uploaded_images": uploaded_images}, f)
+            json.dump(list(uploaded_images), f)
 
 if __name__ == "__main__":
   main()
