@@ -57,12 +57,16 @@ def get_bbox_for_city(city_name: str) -> BoundingBox:
     sys.exit(1)
 
 
-def generate_map_preview(bbox: BoundingBox, location_name: str) -> str:
-    """Generate an interactive folium map showing the bounding box.
+MAX_MAP_SCATTER_POINTS = 5000
+
+
+def generate_map_preview(bbox: BoundingBox, location_name: str, images: list[dict] | None = None) -> str:
+    """Generate an interactive folium map showing the bounding box and optional image locations.
 
     Args:
         bbox: Bounding box to visualize
         location_name: Name of the location for the map title
+        images: Optional list of image dicts with geometry.coordinates to scatter on map
 
     Returns:
         Path to the generated HTML file
@@ -98,6 +102,28 @@ def generate_map_preview(bbox: BoundingBox, location_name: str) -> str:
         tooltip="Download area center"
     ).add_to(m)
 
+    if images:
+        sampled = images
+        if len(images) > MAX_MAP_SCATTER_POINTS:
+            import random
+            sampled = random.sample(images, MAX_MAP_SCATTER_POINTS)
+            print(f"   (Showing {MAX_MAP_SCATTER_POINTS:,} of {len(images):,} points for browser performance)")
+
+        for img in sampled:
+            coords = img.get('geometry', {}).get('coordinates', [])
+            if len(coords) < 2:
+                continue
+            lon, lat = coords[0], coords[1]
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=2,
+                color="blue",
+                fill=True,
+                fill_color="blue",
+                fill_opacity=0.5,
+                opacity=0.5,
+            ).add_to(m)
+
     temp_file = Path(tempfile.gettempdir()) / "cityzero_preview.html"
     m.save(str(temp_file))
 
@@ -128,6 +154,11 @@ def show_download_summary(
 
     if max_images and len(images_to_download) > max_images:
         images_to_download = images_to_download[:max_images]
+
+    print(f"\n📍 Generating coverage map...")
+    coverage_map = generate_map_preview(bbox, location_name, all_images)
+    print(f"   Opening in browser: {coverage_map}")
+    webbrowser.open(f"file://{coverage_map}")
 
     print("\n📋 Summary:")
     print(f"  Location:        {location_name}")
@@ -194,7 +225,7 @@ def interactive_mode() -> tuple[BoundingBox, str]:
     webbrowser.open(f"file://{map_file}")
 
     proceed = questionary.confirm(
-        "Proceed with preview?",
+        "Proceed with discovery?",
         default=True
     ).ask()
 
