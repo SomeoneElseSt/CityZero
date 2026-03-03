@@ -370,3 +370,7 @@ I am currently working on two to-dos:
 1. I've realized I can't get funding to get compute if I don't have compute to obtain results I can talk about whilst applying for funding. A classic Catch-22. I will spend some time applying for compute grants. My hands are tied if I can't test the code I'm working on without a production machine (I don't even have enough space in my computer to download my databases!).
 2. I will email Simile on the error I found on their Generative Agents paper. I've won by following novelty in the past, and this is novel. 
 3. I will read some more papers. Currently, the TacAir-SOAR paper that scaled the above loop to ~8k rules and 450 operators. Perhaps, this kind of architecture could work, just needs a different harness.
+
+**March 3, 2026** 
+
+I've cleaned up the repo to start work on the new custom mapper. I've also learnt how to use Vast AI, they've great prices, seems sufficient. 
