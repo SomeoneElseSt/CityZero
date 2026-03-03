@@ -25,22 +25,9 @@ wip/scripts/*.txt
 wip/keys/
 
 # Data directories
-data/neighborhoods/*
-data/raw/*
-data/processed/*
-data/maps/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/maps/.gitkeep
+data/geodata/*
 wip/db_info/
 wip/segmentation_experiments/query_expansion_pairs/
-
-# Outputs
-outputs/models/*
-outputs/renders/*
-!outputs/models/.gitkeep
-!outputs/renders/.gitkeep
-data/download_metadata.json
 wip/segmentation_experiments/experiment_two/fringes
 wip/binaries/
 
@@ -71,5 +58,3 @@ wip/backblaze/
 # Logs
 *.log
 
-# Misc
-src/cityzero.egg-info/*
