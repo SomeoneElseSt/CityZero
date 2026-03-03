@@ -2,6 +2,8 @@
 """
 YouTube Video Frame Extractor
 Downloads a YouTube video and splits it into individual frames.
+
+Use --lambda for Lambda Cloud / remote VM: auto-installs yt-dlp and writes to ~/youtube_train/.
 """
 
 import sys
@@ -10,19 +12,13 @@ import subprocess
 import shutil
 import argparse
 from pathlib import Path
-import yt_dlp
 
-# Constants - paths relative to script location
 SCRIPT_DIR = Path(__file__).parent.resolve()
-YOUTUBE_TRAIN_DIR = str((SCRIPT_DIR / "../outputs/youtube_train").resolve())
-OUTPUT_DIR = str((SCRIPT_DIR / "../outputs/youtube_train/images").resolve())
-TEMP_VIDEO_PATH = str((SCRIPT_DIR / "temp_video.mp4").resolve())
 FFMPEG_FRAME_PATTERN = "frame_%06d.jpg"
 BYTES_PER_MB = 1024 * 1024
 
 
 def parse_args():
-    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Download YouTube video and extract frames for COLMAP reconstruction",
         epilog="""
@@ -30,45 +26,54 @@ Frame rate recommendations for COLMAP:
   - 10-15 fps: Dashcam/vehicle footage (recommended for moving scenes)
   - 5 fps: Slow-moving scenes or static camera pans
   - 1-2 fps: Very slow scenes with minimal motion
-
-Higher fps = better overlap but more frames to process.
         """
     )
-    parser.add_argument(
-        "url",
-        help="YouTube video URL"
-    )
-    parser.add_argument(
-        "--fps",
-        type=int,
-        default=15,
-        help="Frames per second to extract (default: 15, recommended for dashcam footage)"
-    )
-    parser.add_argument(
-        "--compress",
-        action="store_true",
-        help="Compress extracted frames into tar.gz archive (optional, JPEGs are already compressed)"
-    )
+    parser.add_argument("url", help="YouTube video URL")
+    parser.add_argument("--fps", type=int, default=15, help="Frames per second to extract (default: 15)")
+    parser.add_argument("--compress", action="store_true", help="Compress extracted frames into tar.gz archive")
+    parser.add_argument("--cookies", type=str, help="Path to cookies file for YouTube authentication")
+    parser.add_argument("--lambda", dest="is_lambda", action="store_true", help="Lambda Cloud mode: auto-installs yt-dlp, writes to ~/youtube_train/")
+    parser.add_argument("--skip-install", action="store_true", help="Skip yt-dlp auto-install (Lambda mode only)")
     return parser.parse_args()
 
 
+def resolve_paths(is_lambda: bool) -> tuple[str, str, str]:
+    if is_lambda:
+        base = Path.home() / "youtube_train"
+    else:
+        base = (SCRIPT_DIR / "../outputs/youtube_train").resolve()
+    images_dir = str(base / "images")
+    temp_video = str(Path.home() / "temp_video.mp4") if is_lambda else str(SCRIPT_DIR / "temp_video.mp4")
+    return str(base), images_dir, temp_video
+
+
+def install_ytdlp() -> bool:
+    if shutil.which("yt-dlp"):
+        print("yt-dlp already installed")
+        return True
+    print("Installing yt-dlp...")
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "--user", "yt-dlp"], check=True, capture_output=True)
+        print("yt-dlp installed successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to install yt-dlp: {e}")
+        return False
+
+
 def check_dependencies() -> bool:
-    """Check if required dependencies are installed."""
     if not shutil.which("ffmpeg"):
         print("Error: ffmpeg is not installed or not in PATH")
         return False
-
     try:
         import yt_dlp
         return True
     except ImportError:
-        print("Error: yt-dlp is not installed")
-        print("Install it with: uv pip install yt-dlp")
+        print("Error: yt-dlp is not installed. Run with --lambda to auto-install, or: uv pip install yt-dlp")
         return False
 
 
 def create_output_directory(directory: str) -> bool:
-    """Create output directory if it doesn't exist."""
     try:
         Path(directory).mkdir(parents=True, exist_ok=True)
         return True
@@ -77,9 +82,9 @@ def create_output_directory(directory: str) -> bool:
         return False
 
 
-def download_video(url: str, output_path: str) -> bool:
-    """Download YouTube video to temporary file."""
+def download_video(url: str, output_path: str, cookies_path: str = None) -> bool:
     try:
+        import yt_dlp
 
         ydl_opts = {
             'format': 'best[ext=mp4]',
@@ -87,6 +92,13 @@ def download_video(url: str, output_path: str) -> bool:
             'quiet': False,
             'no_warnings': False,
         }
+
+        if cookies_path:
+            if not os.path.exists(cookies_path):
+                print(f"Error: Cookies file not found: {cookies_path}")
+                return False
+            ydl_opts['cookiefile'] = cookies_path
+            print(f"Using cookies from: {cookies_path}")
 
         print(f"Downloading video from: {url}")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -96,7 +108,7 @@ def download_video(url: str, output_path: str) -> bool:
             print("Error: Video download failed - file not created")
             return False
 
-        print(f"Video downloaded successfully to: {output_path}")
+        print(f"Video downloaded: {os.path.getsize(output_path) / BYTES_PER_MB:.1f} MB")
         return True
 
     except Exception as e:
@@ -104,45 +116,18 @@ def download_video(url: str, output_path: str) -> bool:
         return False
 
 
-def extract_frames(video_path: str, output_dir: str, fps: int = 15) -> bool:
-    """Extract frames from video using ffmpeg.
-    
-    Args:
-        video_path: Path to input video file
-        output_dir: Directory to save extracted frames
-        fps: Frames per second to extract (default: 15)
-             - 10-15 fps recommended for dashcam/vehicle footage
-             - 5 fps is too sparse for moving vehicles (insufficient overlap)
-             - Higher fps = better overlap but more frames to process
-    """
+def extract_frames(video_path: str, output_dir: str, fps: int) -> bool:
     output_pattern = os.path.join(output_dir, FFMPEG_FRAME_PATTERN)
+    ffmpeg_command = ["ffmpeg", "-i", video_path, "-vf", f"fps={fps}", "-q:v", "2", output_pattern]
 
-    ffmpeg_command = [
-        "ffmpeg",
-        "-i", video_path,
-        "-vf", f"fps={fps}",
-        "-q:v", "2",  # Quality level (2 is high quality)
-        output_pattern
-    ]
-
-    print(f"Extracting frames from video at {fps} fps...")
-    print(f"Note: {fps} fps provides good overlap for COLMAP reconstruction from moving vehicles")
+    print(f"Extracting frames at {fps} fps...")
     try:
-        result = subprocess.run(
-            ffmpeg_command,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-
-        # Count extracted frames
-        frame_files = list(Path(output_dir).glob("frame_*.jpg"))
-        print(f"Successfully extracted {len(frame_files)} frames to: {output_dir}")
+        subprocess.run(ffmpeg_command, capture_output=True, text=True, check=True)
+        frame_count = len(list(Path(output_dir).glob("frame_*.jpg")))
+        print(f"Extracted {frame_count} frames to: {output_dir}")
         return True
-
     except subprocess.CalledProcessError as e:
-        print(f"Error: ffmpeg failed to extract frames")
-        print(f"ffmpeg stderr: {e.stderr}")
+        print(f"Error: ffmpeg failed\n{e.stderr}")
         return False
     except Exception as e:
         print(f"Error: Failed to extract frames: {e}")
@@ -150,89 +135,61 @@ def extract_frames(video_path: str, output_dir: str, fps: int = 15) -> bool:
 
 
 def cleanup_temp_file(file_path: str) -> None:
-    """Remove temporary video file."""
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
-            print(f"Cleaned up temporary video file: {file_path}")
     except Exception as e:
-        print(f"Warning: Failed to clean up temporary file: {e}")
+        print(f"Warning: Failed to clean up temp file: {e}")
 
 
-def compress_images(youtube_train_dir: str, images_dir: str) -> bool:
-    """Compress images folder into tar.gz archive."""
-    archive_path = os.path.join(youtube_train_dir, "images.tar.gz")
+def compress_images(base_dir: str, images_dir: str) -> bool:
+    archive_path = os.path.join(base_dir, "images.tar.gz")
 
     if not os.path.exists(images_dir):
         print(f"Error: Images directory does not exist: {images_dir}")
         return False
 
-    print(f"\nCompressing images to: {archive_path}")
-    print("This may take a few minutes depending on the number of frames...")
+    print(f"Compressing images to: {archive_path}")
+    result = subprocess.run(["tar", "-czf", archive_path, "-C", base_dir, "-v", "images"], capture_output=False)
 
-    tar_cmd = [
-        "tar",
-        "-czf",
-        archive_path,
-        "-C", youtube_train_dir,
-        "-v",
-        "images"
-    ]
-
-    result = subprocess.run(tar_cmd, capture_output=False)
-
-    if result.returncode != 0:
-        print(f"Error: tar command failed with exit code {result.returncode}")
+    if result.returncode != 0 or not os.path.exists(archive_path):
+        print("Error: Compression failed")
         return False
 
-    if not os.path.exists(archive_path):
-        print("Error: Archive creation failed - file not created")
-        return False
-
-    archive_size_mb = os.path.getsize(archive_path) / BYTES_PER_MB
-    print(f"\nCompression complete!")
-    print(f"Archive size: {archive_size_mb:.1f} MB")
-    print(f"Location: {archive_path}")
+    print(f"Archive: {os.path.getsize(archive_path) / BYTES_PER_MB:.1f} MB → {archive_path}")
     return True
 
 
 def main() -> int:
-    """Main execution function."""
     args = parse_args()
+    base_dir, output_dir, temp_video = resolve_paths(args.is_lambda)
+
+    if args.is_lambda and not args.skip_install:
+        if not install_ytdlp():
+            return 1
 
     if not check_dependencies():
         return 1
 
-    if not create_output_directory(OUTPUT_DIR):
+    if not create_output_directory(output_dir):
         return 1
 
-    if not download_video(args.url, TEMP_VIDEO_PATH):
-        cleanup_temp_file(TEMP_VIDEO_PATH)
+    if not download_video(args.url, temp_video, cookies_path=args.cookies):
+        cleanup_temp_file(temp_video)
         return 1
 
-    print("\nStarting video frame extraction now - your laptop's fans may spin up quickly.")
-    print("This is normal. You can monitor CPU usage with sudo asitop or htop depending on which you have installed.\n")
-
-    if not extract_frames(TEMP_VIDEO_PATH, OUTPUT_DIR, fps=args.fps):
-        cleanup_temp_file(TEMP_VIDEO_PATH)
+    if not extract_frames(temp_video, output_dir, fps=args.fps):
+        cleanup_temp_file(temp_video)
         return 1
 
-    cleanup_temp_file(TEMP_VIDEO_PATH)
+    cleanup_temp_file(temp_video)
 
     if args.compress:
-        if not compress_images(YOUTUBE_TRAIN_DIR, OUTPUT_DIR):
-            print("\nWarning: Compression failed, but frames were extracted successfully")
-            print(f"Frames location: {OUTPUT_DIR}")
+        if not compress_images(base_dir, output_dir):
+            print(f"Warning: Compression failed, but frames saved to: {output_dir}")
             return 0
 
-        print("\nProcess completed successfully!")
-        print(f"Frames saved to: {OUTPUT_DIR}")
-        print(f"Compressed archive: {YOUTUBE_TRAIN_DIR}/images.tar.gz")
-    else:
-        print("\nProcess completed successfully!")
-        print(f"Frames saved to: {OUTPUT_DIR}")
-        print("(Compression skipped - use --compress flag to create archive)")
-
+    print(f"\nDone. Frames saved to: {output_dir}")
     return 0
 
 
