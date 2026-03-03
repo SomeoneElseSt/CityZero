@@ -2,8 +2,8 @@
 # Agents
 CLAUDE.md
 
-# Cookies 
-wip/scripts/cookies.txt
+# Private (keys, credentials, tokens, backblaze)
+wip/private/
 
 # Python
 __pycache__/
@@ -21,11 +21,9 @@ ENV/
 
 # Environment variables
 .env
-wip/scripts/*.txt
-wip/keys/
 
 # Data directories
-data/geodata/*
+data/sf_geodata/*
 wip/db_info/
 wip/segmentation_experiments/query_expansion_pairs/
 wip/segmentation_experiments/experiment_two/fringes
@@ -39,14 +37,6 @@ wip/outputs/
 *.tar.gz
 *.pem
 *.pub
-
-# Cache
-wip/scripts/uploaded_images.json
-
-# Backup Secrets
-wip/scripts/token.json
-wip/scripts/credentials.json
-wip/backblaze/
 
 # IDE
 .vscode/

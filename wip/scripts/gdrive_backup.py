@@ -10,6 +10,7 @@ The images are already on a Lambda Cloud filesystem but I wanted to back them up
 import os.path
 import json
 import time
+from pathlib import Path
 from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -37,8 +38,10 @@ MAX_UPLOAD_RETRIES = 5
 # Source directory
 SOURCE_DIR = "../../data"
 
+PRIVATE_DIR = Path(__file__).resolve().parents[1] / "private"
+
 # Tracking file
-TRACKING_FILE = "uploaded_images.json"
+TRACKING_FILE = PRIVATE_DIR / "uploaded_images.json"
 
 # Local book-keeping of already uploaded images to skip 
 if os.path.exists(TRACKING_FILE):
@@ -62,19 +65,20 @@ def main():
   # The file token.json stores the user's access and refresh tokens, and is
   # created automatically when the authorization flow completes for the first
   # time.
-  if os.path.exists("token.json"):
-    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+  token_file = PRIVATE_DIR / "token.json"
+  credentials_file = PRIVATE_DIR / "credentials.json"
+
+  if token_file.exists():
+    creds = Credentials.from_authorized_user_file(str(token_file), SCOPES)
   # If there are no (valid) credentials available, let the user log in.
   if not creds or not creds.valid:
     if creds and creds.expired and creds.refresh_token:
       creds.refresh(Request())
     else:
-      flow = InstalledAppFlow.from_client_secrets_file(
-          "credentials.json", SCOPES
-      )
+      flow = InstalledAppFlow.from_client_secrets_file(str(credentials_file), SCOPES)
       creds = flow.run_local_server(port=0)
     # Save the credentials for the next run
-    with open("token.json", "w") as token:
+    with open(token_file, "w") as token:
       token.write(creds.to_json())
 
   service = build("drive", "v3", credentials=creds)
