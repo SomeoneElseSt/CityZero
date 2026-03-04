@@ -374,3 +374,46 @@ I am currently working on two to-dos:
 **March 3, 2026** 
 
 I've cleaned up the repo to start work on the new custom mapper. I've also learnt how to use Vast AI, they've great prices, seems sufficient. 
+
+**March 4, 2026**
+
+Got a big win today! 
+
+I had been thinking about why the scatter plot of images of San Francisco I had downloaded looked so different from the map view of images in Mapillary's website. I've fixed it and think I've found why it was happening. 
+
+First, rehauling my mapillary scripts into a CLI with workers was very fruitful. It cut my discovery times from 1hr30min to 5min in simple cases. 
+
+Second, I figured that with discovery being much faster I could afford to query Mapillary at much lower resolutions, i.e., much smaller cell sizes. 
+
+My code takes the base coordinates of a city and breaks them up into cells, normalizing by a GRID_CELL_SIZE constant that when lower spawns many more. 
+
+It recurses cells into smaller cells if Mapillary provides less than 2000 images (the max their search API returns) and the current cell size is >= MIN_CELL_SIZE (I'm considering whether it should be OR rather than AND here. It's worth trying).  
+
+So, I set both GRID_CELL_SIZE and MIN_CELL_SIZE to extremely low values and let it run. At 5200 cells for San Francisco (prev. runs never went above 300), it found **1.815,838** images!
+
+That's a big step up from the ~600,000 I've right now. 
+
+I added a last step in the CLI where it makes a .html scatter plot with Folium showing the position of all the images found in the discovery phase. This is what 1.815,838 images of SF look like. 
+
+![San Francisco coordinates heatmap of 1.815,838 images.](./assets/heatmaps/sf-heatmap.png)
+
+It is much closer to the Mapillary preview and covers almost every public area of the city. 
+
+Looking closer, I found there was room for further recursion, as some streets still had gaps on them and the FinDi still didn't have full-coverage. 
+
+![San Francisco coordinates heatmap of 1.815,838 images.](./assets/heatmaps/sf-heatmap-close-up.png)
+
+My hypothesis for why this happens is that image-dense areas need higher cell counts to be fully covered because recursion is stopping too early. Say, if you query the whole city, by default it will only provide 2000 images, even if there are millions. I think the same logic is happening in areas where the true image count is much higher than the APIs limit but MIN_CELL_SIZE is too big to recurse further. 
+
+More cells in GRID_CELL_SIZE mean much more exploration (+ relying less on recursion) whilst a very small MIN_CELL_SIZE should narrow down very dense areas like Financial Districts. 
+
+In practice though, the initial cell count seems to matter most.
+
+I am now doing a run with 516000 cells, which should hopefully reveal the true image count ceiling. 
+
+On the meanwhile I'm thinking I might rent a very cheap VM to download those images into my backblaze bucket, using their IDs to avoid the ones I've already downloaded before. Same for feature extraction. If ~600k took about 8 hours on a A100 half a million should work out fine. 
+
+What worries me more is the costs of it all -- the compute, the storage, etc. The algorithms will end up mattering more anyway. Meta could plug directly into Mapillary's servers and do everything I've done here in less time. This data and knowing how to work with it is a good thing, just not the main one. 
+
+
+
