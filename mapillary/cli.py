@@ -22,6 +22,7 @@ Usage:
 """
 
 import argparse
+import atexit
 import sys
 import tempfile
 import webbrowser
@@ -113,6 +114,7 @@ def generate_map_preview(bbox: BoundingBox, location_name: str, images: list[dic
 
     temp_file = Path(tempfile.gettempdir()) / "cityzero_preview.html"
     m.save(str(temp_file))
+    atexit.register(lambda: temp_file.unlink(missing_ok=True))
 
     return str(temp_file)
 
