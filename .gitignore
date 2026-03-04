@@ -47,3 +47,5 @@ wip/outputs/
 # Logs
 *.log
 
+# Visualizations
+*.html
