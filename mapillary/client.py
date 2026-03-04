@@ -13,7 +13,11 @@ from config import BoundingBox, MapillaryConfig, DATA_DIR
 
 
 MAX_RESOLUTION = 2048
-GRID_CELL_SIZE = 0.01
+API_IMAGE_LIMIT = 2000
+# Important: lower to increase initial cell count 
+GRID_CELL_SIZE = 0.0002
+# Important: lower to increase resolution
+MIN_CELL_SIZE = 0.0001 
 SAVE_INTERVAL = 10
 DISCOVERY_WORKERS = 30
 
@@ -177,6 +181,31 @@ class ImageDownloader:
         with open(self.images_metadata_file, 'w') as f:
             json.dump(metadata_list, f, indent=2)
 
+    def _split_cell(self, cell: BoundingBox) -> List[BoundingBox]:
+        """Split a cell into 4 equal quadrants."""
+        mid_lon = (cell.west + cell.east) / 2
+        mid_lat = (cell.south + cell.north) / 2
+        return [
+            BoundingBox(cell.west, cell.south, mid_lon, mid_lat),
+            BoundingBox(mid_lon, cell.south, cell.east, mid_lat),
+            BoundingBox(cell.west, mid_lat, mid_lon, cell.north),
+            BoundingBox(mid_lon, mid_lat, cell.east, cell.north),
+        ]
+
+    def _fetch_cell_images(self, cell: BoundingBox) -> List[Dict]:
+        """Fetch images for a cell, recursively splitting if the API limit is hit.
+
+        Stops recursing at MIN_CELL_SIZE
+        """
+        images = self.client.get_images_in_bbox(cell, limit=API_IMAGE_LIMIT)
+        cell_size = min(cell.east - cell.west, cell.north - cell.south)
+        if len(images) < API_IMAGE_LIMIT or cell_size <= MIN_CELL_SIZE:
+            return images
+        all_images = []
+        for sub_cell in self._split_cell(cell):
+            all_images.extend(self._fetch_cell_images(sub_cell))
+        return all_images
+
     def split_bbox_into_grid(self, bbox: BoundingBox) -> List[BoundingBox]:
         """Split large bounding box into smaller grid cells."""
         cells = []
@@ -211,14 +240,16 @@ class ImageDownloader:
         seen_ids = set()
 
         with ThreadPoolExecutor(max_workers=DISCOVERY_WORKERS) as executor:
-            futures = {executor.submit(self.client.get_images_in_bbox, cell, 5000): cell for cell in cells}
-            for future in tqdm(as_completed(futures), total=len(cells), desc="Discovering", unit="cell"):
-                images = future.result() or []
-                for img in images:
-                    img_id = img.get('id')
-                    if img_id and img_id not in seen_ids:
-                        all_images.append(img)
-                        seen_ids.add(img_id)
+            futures = {executor.submit(self._fetch_cell_images, cell): cell for cell in cells}
+            with tqdm(as_completed(futures), total=len(cells), desc="Discovering", unit="cell") as pbar:
+                for future in pbar:
+                    images = future.result() or []
+                    for img in images:
+                        img_id = img.get('id')
+                        if img_id and img_id not in seen_ids:
+                            all_images.append(img)
+                            seen_ids.add(img_id)
+                    pbar.set_postfix({"found": f"{len(all_images):,}"})
 
         print(f"\n✓ Found {len(all_images)} unique images")
         return all_images
