@@ -234,22 +234,28 @@ class ImageDownloader:
         print(f"   Bbox: {bbox.to_tuple()}")
 
         cells = self.split_bbox_into_grid(bbox)
+        update_interval = max(1, len(cells) // 100)
         print(f"   Searching {len(cells)} grid cells...")
+        print(f"   Time estimates refresh every {update_interval} cells")
 
         all_images = []
         seen_ids = set()
+        completed = 0
 
         with ThreadPoolExecutor(max_workers=DISCOVERY_WORKERS) as executor:
             futures = {executor.submit(self._fetch_cell_images, cell): cell for cell in cells}
-            with tqdm(as_completed(futures), total=len(cells), desc="Discovering", unit="cell") as pbar:
-                for future in pbar:
+            with tqdm(total=len(cells), desc="Discovering", unit="cell") as pbar:
+                for future in as_completed(futures):
                     images = future.result() or []
                     for img in images:
                         img_id = img.get('id')
                         if img_id and img_id not in seen_ids:
                             all_images.append(img)
                             seen_ids.add(img_id)
+                    completed += 1
                     pbar.set_postfix({"found": f"{len(all_images):,}"})
+                    if completed % update_interval == 0:
+                        pbar.update(update_interval)
 
         print(f"\n✓ Found {len(all_images)} unique images")
         return all_images
