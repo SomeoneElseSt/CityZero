@@ -401,7 +401,7 @@ It is much closer to the Mapillary preview and covers almost every public area o
 
 Looking closer, I found there was room for further recursion, as some streets still had gaps on them and the FinDi still didn't have full-coverage. 
 
-![San Francisco coordinates heatmap of 1.815,838 images.](./assets/heatmaps/sf-heatmap-close-up.png)
+![San Francisco coordinates heatmap of 1.815,838 images zoomed in to Powell station.](./assets/heatmaps/sf-heatmap-close-up.png)
 
 My hypothesis for why this happens is that image-dense areas need higher cell counts to be fully covered because recursion is stopping too early. Say, if you query the whole city, by default it will only provide 2000 images, even if there are millions. I think the same logic is happening in areas where the true image count is much higher than the APIs limit but MIN_CELL_SIZE is too big to recurse further. 
 
@@ -409,11 +409,24 @@ More cells in GRID_CELL_SIZE mean much more exploration (+ relying less on recur
 
 In practice though, the initial cell count seems to matter most.
 
-I am now doing a run with 516000 cells, which should hopefully reveal the true image count ceiling. 
+I am now doing a run with 516,000 cells, which should hopefully reveal the true image count ceiling. 
 
 On the meanwhile I'm thinking I might rent a very cheap VM to download those images into my backblaze bucket, using their IDs to avoid the ones I've already downloaded before. Same for feature extraction. If ~600k took about 8 hours on a A100 half a million should work out fine. 
 
 What worries me more is the costs of it all -- the compute, the storage, etc. The algorithms will end up mattering more anyway. Meta could plug directly into Mapillary's servers and do everything I've done here in less time. This data and knowing how to work with it is a good thing, just not the main one. 
 
+Update #1: The 516000 cells run has been going on for ~6 hours. Its discovered 2.5M images.
+ 
+Update #2: The run finished with 3.680,480 discovered images. It's a big jump from ~600k. There is still room for more, though. When it was ending, images were still being found. 
 
+The map is beautiful though. 
 
+![San Francisco coordinates heatmap of 3.680,480 images.](./assets/heatmaps/sf-heatmap-2.png)
+
+It's much denser and connected. The FinDi came through really nicely as well as shown in the close up below.
+
+![San Francisco coordinates heatmap of 3.680,480 images zoomed in to Powell station.](./assets/heatmaps/sf-heatmap-close-up-2.png)
+
+Now I just need to figure out how to download all these images. I think there are still some I haven't gotten, so I might do a longer run. 
+
+I'm also thinking about how so much more data opens this up as a problem. In a way, I am mapping one distribution to another. Is deep learning applicable? Maybe. 
