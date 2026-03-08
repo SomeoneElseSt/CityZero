@@ -183,7 +183,7 @@ def show_download_summary(
             db.set_meta("bbox_east", str(bbox.east))
             db.set_meta("bbox_north", str(bbox.north))
 
-    pending = db.get_pending_images()
+    pending = db.get_pending_images_metadata()
 
     if not pending:
         if db.get_image_count() > 0:
