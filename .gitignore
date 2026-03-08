@@ -23,7 +23,7 @@ ENV/
 .env
 
 # Data directories
-data/sf_geodata/*
+data/*
 wip/db_info/
 wip/segmentation/outputs/
 wip/binaries/
