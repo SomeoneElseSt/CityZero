@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Project root directory
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent
 
 # Data directory
 DATA_DIR = PROJECT_ROOT / "data"
