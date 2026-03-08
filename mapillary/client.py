@@ -1,24 +1,23 @@
 """Mapillary API client and image downloader for street view imagery."""
 
-import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 import mapillary.interface as mly
 import requests
 from tqdm import tqdm
 
 from config import BoundingBox, MapillaryConfig, DATA_DIR
+from db import DiscoveryDB
 
 
 MAX_RESOLUTION = 2048
 API_IMAGE_LIMIT = 2000
-# Important: lower to increase initial cell count 
+# Important: lower to increase initial cell count
 GRID_CELL_SIZE = 0.0002
 # Important: lower to increase resolution
-MIN_CELL_SIZE = 0.0001 
-SAVE_INTERVAL = 10
+MIN_CELL_SIZE = 0.0001
 DISCOVERY_WORKERS = 30
 
 OPTIONAL_FIELDS = {
@@ -127,59 +126,6 @@ class ImageDownloader:
         self.client = client
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.metadata_file = self.output_dir / "download_metadata.json"
-        self.images_metadata_file = self.output_dir / "images_metadata.json"
-
-    def get_downloaded_image_ids(self) -> Set[str]:
-        """Get set of already downloaded image IDs."""
-        downloaded_ids = set()
-
-        if self.metadata_file.exists():
-            with open(self.metadata_file, 'r') as f:
-                metadata = json.load(f)
-                downloaded_ids.update(metadata.get('downloaded_ids', []))
-
-        for file_path in self.output_dir.glob("*.jpg"):
-            downloaded_ids.add(file_path.stem)
-
-        return downloaded_ids
-
-    def save_metadata(self, downloaded_ids: Set[str], total_found: int):
-        """Save download metadata to track progress."""
-        metadata = {
-            'total_found': total_found,
-            'total_downloaded': len(downloaded_ids),
-            'downloaded_ids': list(downloaded_ids)
-        }
-        with open(self.metadata_file, 'w') as f:
-            json.dump(metadata, f, indent=2)
-
-    def save_images_metadata(self, images: List[Dict]):
-        """Save full metadata for downloaded images (GPS coords, timestamps, etc)."""
-        metadata_list = []
-        for img in images:
-            if not img.get('id'):
-                continue
-
-            geometry = img.get('geometry', {})
-            coords = geometry.get('coordinates', []) if geometry else []
-
-            entry = {
-                'id': img.get('id'),
-                'longitude': coords[0] if len(coords) > 0 else None,
-                'latitude': coords[1] if len(coords) > 1 else None,
-                'captured_at': img.get('captured_at'),
-                'compass_angle': img.get('compass_angle'),
-                'sequence': img.get('sequence'),
-                'is_pano': img.get('is_pano'),
-            }
-
-            entry.update({dst: img[src] for src, dst in OPTIONAL_FIELDS.items() if src in img})
-
-            metadata_list.append(entry)
-
-        with open(self.images_metadata_file, 'w') as f:
-            json.dump(metadata_list, f, indent=2)
 
     def _split_cell(self, cell: BoundingBox) -> List[BoundingBox]:
         """Split a cell into 4 equal quadrants."""
@@ -228,8 +174,12 @@ class ImageDownloader:
 
         return cells
 
-    def discover_images(self, bbox: BoundingBox) -> List[Dict]:
-        """Discover all available images in bounding box."""
+    def discover_images(self, bbox: BoundingBox, db: Optional["DiscoveryDB"] = None) -> List[Dict]:
+        """Discover all available images in bounding box.
+
+        If db is provided, inserts images into the DB as each cell completes so
+        progress is preserved on Ctrl+C.
+        """
         print(f"\n🔍 Discovering images in area...")
         print(f"   Bbox: {bbox.to_tuple()}")
 
@@ -246,12 +196,16 @@ class ImageDownloader:
             futures = {executor.submit(self._fetch_cell_images, cell): cell for cell in cells}
             with tqdm(total=len(cells), desc="Discovering", unit="cell") as pbar:
                 for future in as_completed(futures):
-                    images = future.result() or []
-                    for img in images:
+                    cell_images = future.result() or []
+                    new_images = []
+                    for img in cell_images:
                         img_id = img.get('id')
                         if img_id and img_id not in seen_ids:
                             all_images.append(img)
+                            new_images.append(img)
                             seen_ids.add(img_id)
+                    if db and new_images:
+                        db.insert_images(new_images)
                     completed += 1
                     pbar.set_postfix({"found": f"{len(all_images):,}"})
                     if completed % update_interval == 0:
@@ -260,13 +214,19 @@ class ImageDownloader:
         print(f"\n✓ Found {len(all_images)} unique images")
         return all_images
 
-    def download_images(self, bbox: BoundingBox, max_images: int = None, images: List[Dict] = None) -> Dict[str, int]:
-        """Download all images in bounding box. Pass `images` to skip rediscovery."""
+    def download_images(
+        self,
+        bbox: BoundingBox,
+        db: DiscoveryDB,
+        max_images: int = None,
+        images: List[Dict] = None,
+    ) -> Dict[str, int]:
+        """Download images. Pass `images` to skip rediscovery. Uses db for tracking."""
         print("\n" + "="*70)
         print("CityZero Image Downloader")
         print("="*70)
 
-        downloaded_ids = self.get_downloaded_image_ids()
+        downloaded_ids = db.get_downloaded_ids()
         if downloaded_ids:
             print(f"\n📂 Found {len(downloaded_ids)} already downloaded images")
             print("   (Will skip these to resume download)")
@@ -314,18 +274,12 @@ class ImageDownloader:
                 )
 
                 if success:
-                    downloaded_ids.add(img_id)
+                    db.mark_downloaded(img_id)
                     success_count += 1
                 else:
                     failed_count += 1
 
                 pbar.update(1)
-
-                if success_count % SAVE_INTERVAL == 0:
-                    self.save_metadata(downloaded_ids, len(all_images))
-
-        self.save_metadata(downloaded_ids, len(all_images))
-        self.save_images_metadata(all_images)
 
         print("\n" + "="*70)
         print("Download Complete")
@@ -334,7 +288,6 @@ class ImageDownloader:
         print(f"Already had:       {skipped_count:,}")
         print(f"Downloaded:        {success_count:,}")
         print(f"Failed:            {failed_count:,}")
-        print(f"Total on disk:     {len(downloaded_ids):,}")
         print("="*70)
 
         return {
