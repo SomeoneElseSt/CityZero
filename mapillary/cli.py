@@ -136,6 +136,7 @@ def warn_if_stale(db: DiscoveryDB) -> None:
 
 
 def prompt_discovery_state() -> str:
+    print()
     state = questionary.select(
         "An existing database for this city was found. Discovery state?",
         choices=[
