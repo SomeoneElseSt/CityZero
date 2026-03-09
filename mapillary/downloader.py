@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import piexif
 import mapillary.interface as mly
 import requests
 from tqdm import tqdm
@@ -27,6 +28,34 @@ OPTIONAL_FIELDS = {
     'height': 'image_height',
     'width': 'image_width',
 }
+
+
+def embed_gps_exif(path: Path, lat: float, lon: float) -> None:
+    """Write GPS coordinates into JPEG EXIF in-place without re-encoding."""
+    def to_dms(deg: float) -> tuple:
+        d = int(deg)
+        m = int((deg - d) * 60)
+        s = round(((deg - d) * 60 - m) * 60 * 1000)
+        return ((d, 1), (m, 1), (s, 1000))
+
+    gps_ifd = {
+        piexif.GPSIFD.GPSLatitudeRef: b"N" if lat >= 0 else b"S",
+        piexif.GPSIFD.GPSLatitude: to_dms(abs(lat)),
+        piexif.GPSIFD.GPSLongitudeRef: b"E" if lon >= 0 else b"W",
+        piexif.GPSIFD.GPSLongitude: to_dms(abs(lon)),
+    }
+    exif_bytes = piexif.dump({"GPS": gps_ifd})
+    piexif.insert(exif_bytes, str(path))
+
+
+def extract_lat_lon(img: Dict) -> tuple[float, float] | None:
+    """Extract (lat, lon) from either DB format {lat, lon} or API format {geometry.coordinates}."""
+    if "lat" in img:
+        return img["lat"], img["lon"]
+    coords = img.get("geometry", {}).get("coordinates", [])
+    if len(coords) >= 2:
+        return coords[1], coords[0]
+    return None
 
 
 class MapillaryClient:
@@ -266,6 +295,12 @@ class ImageDownloader:
                     continue
 
                 output_path = self.output_dir / f"{img_id}.jpg"
+                if output_path.exists():
+                    db.mark_downloaded(img_id)
+                    skipped_count += 1
+                    completed += 1
+                    continue
+
                 success = self.client.download_image(
                     image_id=img_id,
                     output_path=output_path,
@@ -273,6 +308,9 @@ class ImageDownloader:
                 )
 
                 if success:
+                    lat_lon = extract_lat_lon(img)
+                    if lat_lon:
+                        embed_gps_exif(output_path, *lat_lon)
                     db.mark_downloaded(img_id)
                     success_count += 1
                 else:
