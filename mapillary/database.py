@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from config import GPS_COORD_PRECISION
+
 
 class DiscoveryDB:
     """SQLite discovery cache — singleton per db_path."""
@@ -51,7 +53,9 @@ class DiscoveryDB:
             coords = geometry.get("coordinates", []) if geometry else []
             if not img_id or len(coords) < 2:
                 continue
-            rows.append((img_id, coords[1], coords[0], now))
+            lat = round(coords[1] * GPS_COORD_PRECISION) / GPS_COORD_PRECISION
+            lon = round(coords[0] * GPS_COORD_PRECISION) / GPS_COORD_PRECISION
+            rows.append((img_id, lat, lon, now))
         self.conn.executemany(
             "INSERT OR IGNORE INTO images (id, lat, lon, discovered_at) VALUES (?, ?, ?, ?)",
             rows,
