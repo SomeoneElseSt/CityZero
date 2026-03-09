@@ -166,6 +166,7 @@ def show_download_summary(
     save_to_db: bool,
     max_images: int = None,
     is_interactive: bool = True,
+    show_preview: bool = True,
 ) -> tuple[bool, list[dict]]:
     """Determine images to download and show summary before download.
 
@@ -234,10 +235,11 @@ def show_download_summary(
             coords = img.get("geometry", {}).get("coordinates", [])
             if len(coords) >= 2:
                 heat_coords.append([coords[1], coords[0]])
-    print(f"\n📍 Generating coverage map...")
-    coverage_map = generate_map_preview(bbox, location_name, heat_coords)
-    print(f"   Opening in browser: {coverage_map}")
-    webbrowser.open(f"file://{coverage_map}")
+    if show_preview:
+        print(f"\n📍 Generating coverage map...")
+        coverage_map = generate_map_preview(bbox, location_name, heat_coords)
+        print(f"   Opening in browser: {coverage_map}")
+        webbrowser.open(f"file://{coverage_map}")
 
     if save_to_db:
         total = db.get_image_count()
@@ -259,7 +261,7 @@ def show_download_summary(
     return bool(proceed), pending
 
 
-def interactive_mode() -> tuple[BoundingBox, str]:
+def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str]:
     """Run interactive mode: prompt user to select city and show map preview.
 
     Returns:
@@ -292,10 +294,11 @@ def interactive_mode() -> tuple[BoundingBox, str]:
         location_name = selected
         bbox = get_bbox_for_city(selected)
 
-    print(f"\n📍 Generating map preview for {location_name}...")
-    map_file = generate_map_preview(bbox, location_name)
-    print(f"   Opening in browser: {map_file}")
-    webbrowser.open(f"file://{map_file}")
+    if show_preview:
+        print(f"\n📍 Generating map preview for {location_name}...")
+        map_file = generate_map_preview(bbox, location_name)
+        print(f"   Opening in browser: {map_file}")
+        webbrowser.open(f"file://{map_file}")
 
     return bbox, location_name
 
@@ -344,6 +347,11 @@ Examples:
         action='store_true',
         help='Skip saving discovered image IDs to images.db (headless only)',
     )
+    parser.add_argument(
+        '--no-preview',
+        action='store_true',
+        help='Skip opening browser map previews (useful for headless/VM environments)',
+    )
 
     args = parser.parse_args()
 
@@ -356,8 +364,10 @@ Examples:
 
     is_interactive = not (args.city or args.bbox)
 
+    show_preview = not args.no_preview
+
     if is_interactive:
-        bbox, location_name = interactive_mode()
+        bbox, location_name = interactive_mode(show_preview=show_preview)
     elif args.bbox:
         print(f"\n📍 Using custom bounding box")
         bbox = BoundingBox.from_string(args.bbox)
@@ -371,7 +381,7 @@ Examples:
         bbox = get_bbox_for_city(args.city)
         location_name = args.city
 
-    if not is_interactive and args.preview:
+    if not is_interactive and args.preview and show_preview:
         print(f"\n📍 Generating map preview...")
         map_file = generate_map_preview(bbox, location_name)
         print(f"   Opening in browser: {map_file}")
@@ -419,7 +429,7 @@ Examples:
                 sys.exit(0)
 
     confirmed, pending_images = show_download_summary(
-        downloader, bbox, location_name, db, state, save_to_db, args.limit, is_interactive
+        downloader, bbox, location_name, db, state, save_to_db, args.limit, is_interactive, show_preview
     )
     if not confirmed:
         print("\nCancelled by user.")
