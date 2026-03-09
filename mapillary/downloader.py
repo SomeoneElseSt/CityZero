@@ -301,9 +301,6 @@ class ImageDownloader:
     ) -> Dict[str, int]:
         """Download images. Pass `images` to skip rediscovery. Uses db for tracking."""
         downloaded_ids = db.get_downloaded_ids()
-        if downloaded_ids:
-            print(f"\nSkipping {len(downloaded_ids):,} already downloaded images")
-
         all_images = images if images is not None else self.discover_images(bbox)
         total_images_in_db = db.get_image_count()
         already_had_at_start = total_images_in_db - db.get_pending_count()

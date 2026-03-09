@@ -199,31 +199,32 @@ def show_download_summary(
         if save_to_db:
             db.set_meta("last_discovered_at", str(int(datetime.now(timezone.utc).timestamp())))
 
-        if state == "rediscover":
-            existing_images = list(downloader.output_dir.glob("*.jpg"))
-            if existing_images and ask_or_exit(questionary.confirm(
-                f"Found {len(existing_images):,} downloaded images on disk. Delete?",
-                default=False,
-            )):
-                for img_path in existing_images:
-                    img_path.unlink()
-                print(f"✓ Deleted {len(existing_images):,} existing images")
-
     if not save_to_db and state in ("merge", "rediscover"):
         downloaded_ids = db.get_downloaded_ids()
-        pending = [img for img in discovered if img.get("id") not in downloaded_ids]
+        pending_raw = [img for img in discovered if img.get("id") not in downloaded_ids]
     else:
-        pending = db.get_pending_images_metadata()
+        pending_raw = db.get_pending_images_metadata()
 
-    # Reconcile disk state before applying --limit so the limit picks genuinely new images
-    pending = downloader.reconcile_disk_images(pending, db)
-
-    if not pending:
+    if not pending_raw:
         if db.get_image_count() > 0:
             print("✓ All images already downloaded!")
         else:
             print("❌ No images found in existing database. Consider running with --state rediscover.")
         return False, []
+
+    # Delete old disk images before reconcile so reconcile sees a clean slate
+    if state == "rediscover":
+        existing_images = list(downloader.output_dir.glob("*.jpg"))
+        if existing_images and ask_or_exit(questionary.confirm(
+            f"Found {len(existing_images):,} downloaded images on disk. Delete?",
+            default=False,
+        )):
+            for img_path in existing_images:
+                img_path.unlink()
+            print(f"✓ Deleted {len(existing_images):,} existing images")
+
+    # Reconcile disk state before applying --limit so the limit picks genuinely new images
+    pending = downloader.reconcile_disk_images(pending_raw, db)
 
     if max_images and len(pending) > max_images:
         pending = pending[:max_images]
