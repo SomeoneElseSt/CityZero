@@ -271,6 +271,27 @@ class ImageDownloader:
         print(f"\n✓ Found {len(all_images)} unique images")
         return all_images
 
+    def reconcile_disk_images(self, images: List[Dict], db: DiscoveryDB) -> List[Dict]:
+        """Mark images already on disk as downloaded in DB. Returns images not yet on disk."""
+        remaining = []
+        for img in images:
+            img_id = img.get('id')
+            if not img_id:
+                continue
+            output_path = self.output_dir / f"{img_id}.jpg"
+            if not output_path.exists():
+                remaining.append(img)
+                continue
+            lat_lon = extract_lat_lon(img)
+            if lat_lon:
+                if read_gps_exif(output_path) is None:
+                    embed_gps_exif(output_path, *lat_lon)
+                db.upsert_downloaded(img_id, *lat_lon)
+            else:
+                output_path.unlink()
+                remaining.append(img)
+        return remaining
+
     def download_images(
         self,
         bbox: BoundingBox,
@@ -285,6 +306,8 @@ class ImageDownloader:
             print("   (Will skip these to resume download)")
 
         all_images = images if images is not None else self.discover_images(bbox)
+        total_images_in_db = db.get_image_count()
+        already_had_at_start = total_images_in_db - db.get_pending_count()
 
         if not all_images:
             print("\n❌ No images found in this area")
@@ -357,11 +380,14 @@ class ImageDownloader:
                     pbar.update(update_interval)
             pbar.update(pbar.total - pbar.n)
 
+        total_downloaded = len(db.get_downloaded_ids())
+        
         print("\n📋 Download Summary:")
-        print(f"  {'Total found:':<22} {len(all_images):,}")
-        print(f"  {'Already had:':<22} {skipped_count:,}")
-        print(f"  {'Downloaded:':<22} {success_count:,}")
-        print(f"  {'Failed:':<22} {failed_count:,}")
+        print(f"  {'Discovered Images:':<22} {total_images_in_db:,}")
+        print(f"  {'Existing Downloads:':<22} {already_had_at_start:,}")
+        print(f"  {'New Downloads:':<22} {success_count:,}")
+        print(f"  {'Failed Downloads:':<22} {failed_count:,}")
+        print(f"  {'Total Downloads:':<22} {total_downloaded:,}\n")
 
         return {
             'total_found': len(all_images),

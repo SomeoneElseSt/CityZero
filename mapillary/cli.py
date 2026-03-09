@@ -192,6 +192,9 @@ def show_download_summary(
     else:
         pending = db.get_pending_images_metadata()
 
+    # Reconcile disk state before applying --limit so the limit picks genuinely new images
+    pending = downloader.reconcile_disk_images(pending, db)
+
     if not pending:
         if db.get_image_count() > 0:
             print("✓ All images already downloaded!")
