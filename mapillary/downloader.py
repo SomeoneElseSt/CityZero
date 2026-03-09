@@ -30,6 +30,29 @@ OPTIONAL_FIELDS = {
 }
 
 
+def dms_to_deg(dms: tuple) -> float:
+    d, m, s = dms
+    return d[0] / d[1] + m[0] / m[1] / 60 + s[0] / s[1] / 3600
+
+
+def read_gps_exif(path: Path) -> "tuple[float, float] | None":
+    """Read GPS lat/lon from JPEG EXIF, or None if not present."""
+    try:
+        exif = piexif.load(str(path))
+        gps = exif.get("GPS", {})
+        lat_dms = gps.get(piexif.GPSIFD.GPSLatitude)
+        lat_ref = gps.get(piexif.GPSIFD.GPSLatitudeRef)
+        lon_dms = gps.get(piexif.GPSIFD.GPSLongitude)
+        lon_ref = gps.get(piexif.GPSIFD.GPSLongitudeRef)
+        if not all([lat_dms, lat_ref, lon_dms, lon_ref]):
+            return None
+        lat = dms_to_deg(lat_dms) * (1 if lat_ref in (b"N", "N") else -1)
+        lon = dms_to_deg(lon_dms) * (1 if lon_ref in (b"E", "E") else -1)
+        return lat, lon
+    except Exception:
+        return None
+
+
 def embed_gps_exif(path: Path, lat: float, lon: float) -> None:
     """Write GPS coordinates into JPEG EXIF in-place without re-encoding."""
     def to_dms(deg: float) -> tuple:
@@ -44,7 +67,12 @@ def embed_gps_exif(path: Path, lat: float, lon: float) -> None:
         piexif.GPSIFD.GPSLongitudeRef: b"E" if lon >= 0 else b"W",
         piexif.GPSIFD.GPSLongitude: to_dms(abs(lon)),
     }
-    exif_bytes = piexif.dump({"GPS": gps_ifd})
+    try:
+        exif_data = piexif.load(str(path))
+    except Exception:
+        exif_data = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
+    exif_data["GPS"] = gps_ifd
+    exif_bytes = piexif.dump(exif_data)
     piexif.insert(exif_bytes, str(path))
 
 
@@ -296,10 +324,20 @@ class ImageDownloader:
 
                 output_path = self.output_dir / f"{img_id}.jpg"
                 if output_path.exists():
-                    db.mark_downloaded(img_id)
-                    skipped_count += 1
-                    completed += 1
-                    continue
+                    lat_lon = read_gps_exif(output_path)
+                    if not lat_lon:
+                        # Image on disk has no GPS EXIF — embed from API/DB coords
+                        lat_lon = extract_lat_lon(img)
+                        if lat_lon:
+                            embed_gps_exif(output_path, *lat_lon)
+                        else:
+                            # No coords available — delete and re-download
+                            output_path.unlink()
+                    if lat_lon:
+                        db.upsert_downloaded(img_id, *lat_lon)
+                        skipped_count += 1
+                        completed += 1
+                        continue
 
                 success = self.client.download_image(
                     image_id=img_id,

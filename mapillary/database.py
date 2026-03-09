@@ -58,6 +58,11 @@ class DiscoveryDB:
         )
         self.conn.commit()
 
+    def upsert_downloaded(self, image_id: str, lat: float, lon: float) -> None:
+        """Insert image if not present, then mark as downloaded."""
+        self.insert_images([{"id": image_id, "geometry": {"coordinates": [lon, lat]}}])
+        self.mark_downloaded(image_id)
+
     def mark_downloaded(self, image_id: str) -> None:
         now = int(datetime.now(timezone.utc).timestamp())
         self.conn.execute(
