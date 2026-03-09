@@ -199,7 +199,7 @@ def show_download_summary(
             existing_images = list(downloader.output_dir.glob("*.jpg"))
             if existing_images and ask_or_exit(questionary.confirm(
                 f"Found {len(existing_images):,} downloaded images on disk. Delete?",
-                default=True,
+                default=False,
             )):
                 for img_path in existing_images:
                     img_path.unlink()
@@ -422,7 +422,7 @@ Examples:
         downloader, bbox, location_name, db, state, save_to_db, args.limit, is_interactive
     )
     if not confirmed:
-        print("\n⚠️  Download cancelled by user.")
+        print("\nCancelled by user.")
         sys.exit(0)
 
     try:

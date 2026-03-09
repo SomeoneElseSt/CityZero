@@ -302,8 +302,7 @@ class ImageDownloader:
         """Download images. Pass `images` to skip rediscovery. Uses db for tracking."""
         downloaded_ids = db.get_downloaded_ids()
         if downloaded_ids:
-            print(f"\n📂 Found {len(downloaded_ids)} already downloaded images")
-            print("   (Will skip these to resume download)")
+            print(f"\nSkipping {len(downloaded_ids):,} already downloaded images")
 
         all_images = images if images is not None else self.discover_images(bbox)
         total_images_in_db = db.get_image_count()
