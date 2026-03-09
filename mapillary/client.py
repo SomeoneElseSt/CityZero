@@ -222,10 +222,6 @@ class ImageDownloader:
         images: List[Dict] = None,
     ) -> Dict[str, int]:
         """Download images. Pass `images` to skip rediscovery. Uses db for tracking."""
-        print("\n" + "="*70)
-        print("CityZero Image Downloader")
-        print("="*70)
-
         downloaded_ids = db.get_downloaded_ids()
         if downloaded_ids:
             print(f"\n📂 Found {len(downloaded_ids)} already downloaded images")
