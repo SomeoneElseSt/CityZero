@@ -282,14 +282,11 @@ class ImageDownloader:
                 if completed % update_interval == 0:
                     pbar.update(update_interval)
 
-        print("\n" + "="*70)
-        print("Download Complete")
-        print("="*70)
-        print(f"Total found:       {len(all_images):,}")
-        print(f"Already had:       {skipped_count:,}")
-        print(f"Downloaded:        {success_count:,}")
-        print(f"Failed:            {failed_count:,}")
-        print("="*70)
+        print("\n📋 Download Summary:")
+        print(f"  {'Total found:':<22} {len(all_images):,}")
+        print(f"  {'Already had:':<22} {skipped_count:,}")
+        print(f"  {'Downloaded:':<22} {success_count:,}")
+        print(f"  {'Failed:':<22} {failed_count:,}")
 
         return {
             'total_found': len(all_images),

@@ -218,7 +218,7 @@ def show_download_summary(
 
     total = db.get_image_count()
     downloaded_count = total - db.get_pending_count()
-    print("\n📋 Summary:")
+    print("\n📋 Discovery Summary:")
     print(f"  {'Location:':<22} {location_name}")
     print(f"  {'Total found:':<22} {total:,}")
     print(f"  {'Already downloaded:':<22} {downloaded_count:,}")
