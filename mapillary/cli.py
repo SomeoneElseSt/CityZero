@@ -40,7 +40,7 @@ import folium.plugins
 import questionary
 
 from config import get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES
-from client import MapillaryClient, ImageDownloader
+from downloader import MapillaryClient, ImageDownloader
 from db import DiscoveryDB
 
 
