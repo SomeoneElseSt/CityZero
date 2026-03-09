@@ -47,6 +47,14 @@ from database import DiscoveryDB
 DISCOVERY_STALENESS_DAYS = 21
 
 
+def ask_or_exit(question):
+    """Ask a questionary prompt and exit if the user cancels with Ctrl+C."""
+    answer = question.ask()
+    if answer is None:
+        sys.exit(0)
+    return answer
+
+
 def get_bbox_for_city(city_name: str) -> BoundingBox:
     """Get bounding box for a known city.
 
@@ -145,8 +153,8 @@ def prompt_discovery_state() -> str:
             questionary.Choice(title="Merge: re-discover and add new images to existing DB", value="merge"),
             questionary.Choice(title="Rediscover: wipe DB and run a full fresh discovery", value="rediscover"),
         ],
-    ).ask()
-    return state or "maintain"
+    )
+    return ask_or_exit(state) or "maintain"
 
 
 def show_download_summary(
@@ -157,6 +165,7 @@ def show_download_summary(
     state: str,
     save_to_db: bool,
     max_images: int = None,
+    is_interactive: bool = True,
 ) -> tuple[bool, list[dict]]:
     """Determine images to download and show summary before download.
 
@@ -185,6 +194,16 @@ def show_download_summary(
 
         if save_to_db:
             db.set_meta("last_discovered_at", str(int(datetime.now(timezone.utc).timestamp())))
+
+        if state == "rediscover":
+            existing_images = list(downloader.output_dir.glob("*.jpg"))
+            if existing_images and ask_or_exit(questionary.confirm(
+                f"Found {len(existing_images):,} downloaded images on disk. Delete?",
+                default=True,
+            )):
+                for img_path in existing_images:
+                    img_path.unlink()
+                print(f"✓ Deleted {len(existing_images):,} existing images")
 
     if not save_to_db and state in ("merge", "rediscover"):
         downloaded_ids = db.get_downloaded_ids()
@@ -232,10 +251,10 @@ def show_download_summary(
     print(f"  {'Already downloaded:':<22} {downloaded_count:,}")
     print(f"  {'New to download:':<22} {len(pending):,}")
 
-    proceed = questionary.confirm(
+    proceed = ask_or_exit(questionary.confirm(
         f"Download {len(pending):,} new images?",
         default=True,
-    ).ask()
+    ))
 
     return bool(proceed), pending
 
@@ -253,24 +272,16 @@ def interactive_mode() -> tuple[BoundingBox, str]:
     city_choices = [city.title() for city in sorted(CITY_BBOXES.keys())]
     city_choices.append("Custom bounding box...")
 
-    selected = questionary.select(
+    selected = ask_or_exit(questionary.select(
         "Select a city or custom area:",
         choices=city_choices
-    ).ask()
-
-    if selected is None:
-        print("\n⚠️  No selection made. Exiting.")
-        sys.exit(0)
+    ))
 
     if selected == "Custom bounding box...":
-        bbox_str = questionary.text(
+        bbox_str = ask_or_exit(questionary.text(
             "Enter bounding box (west,south,east,north):",
             default="-122.52,37.70,-122.35,37.83"
-        ).ask()
-
-        if bbox_str is None:
-            print("\n⚠️  No input provided. Exiting.")
-            sys.exit(0)
+        ))
 
         bbox = BoundingBox.from_string(bbox_str)
         if bbox is None:
@@ -404,13 +415,11 @@ Examples:
         state = "rediscover"
         save_to_db = not args.no_save_discovery
         if is_interactive:
-            proceed = questionary.confirm("Proceed with discovery?", default=True).ask()
-            if not proceed:
-                print("\n⚠️  Discovery cancelled by user..")
+            if not ask_or_exit(questionary.confirm("Proceed with discovery?", default=True)):
                 sys.exit(0)
 
     confirmed, pending_images = show_download_summary(
-        downloader, bbox, location_name, db, state, save_to_db, args.limit
+        downloader, bbox, location_name, db, state, save_to_db, args.limit, is_interactive
     )
     if not confirmed:
         print("\n⚠️  Download cancelled by user.")
