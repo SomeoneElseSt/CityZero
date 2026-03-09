@@ -430,3 +430,9 @@ It's much denser and connected. The FinDi came through really nicely as well as 
 Now I just need to figure out how to download all these images. I think there are still some I haven't gotten, so I might do a longer run. 
 
 I'm also thinking about how so much more data opens this up as a problem. In a way, I am mapping one distribution to another. Is deep learning applicable? Maybe. 
+
+**March 9, 2025**
+
+I've been caught up with assignments but did a lot of good eng. work today. I overhauled the mapillary client I had before to a rather robust CLI. Now it uses SQLite to keep track of images, injects coords into the exif directly, amongst other niceties. I'm thinking I might release it as a package for anyone who needs tons of open source images of a place/city. We'll see. 
+
+My current plan is: get all my assignments/academic yadayada done this week, then lock in until the 20th before an interview I've coming up. I'll work on the mapper algorithms I've been putting off for oh-so-very long at this point. I've now figured out how to use Vast and if the algorithm is good enough it should run on a not so expensive GPU. 
