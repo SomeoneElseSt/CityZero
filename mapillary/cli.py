@@ -172,17 +172,18 @@ def show_download_summary(
         db.wipe_images()
 
     if state in ("merge", "rediscover"):
-        discovery_db = db if save_to_db else None
-        downloader.discover_images(bbox, db=discovery_db)
-
         if save_to_db:
-            now_ts = str(int(datetime.now(timezone.utc).timestamp()))
-            db.set_meta("last_discovered_at", now_ts)
             db.set_meta("city", location_name)
             db.set_meta("bbox_west", str(bbox.west))
             db.set_meta("bbox_south", str(bbox.south))
             db.set_meta("bbox_east", str(bbox.east))
             db.set_meta("bbox_north", str(bbox.north))
+
+        discovery_db = db if save_to_db else None
+        downloader.discover_images(bbox, db=discovery_db)
+
+        if save_to_db:
+            db.set_meta("last_discovered_at", str(int(datetime.now(timezone.utc).timestamp())))
 
     pending = db.get_pending_images_metadata()
 
@@ -205,10 +206,10 @@ def show_download_summary(
     total = db.get_image_count()
     downloaded_count = total - db.get_pending_count()
     print("\n📋 Summary:")
-    print(f"  Location:        {location_name}")
-    print(f"  Total found:     {total:,}")
-    print(f"  Already downloaded: {downloaded_count:,}")
-    print(f"  New to download: {len(pending):,}")
+    print(f"  {'Location:':<22} {location_name}")
+    print(f"  {'Total found:':<22} {total:,}")
+    print(f"  {'Already downloaded:':<22} {downloaded_count:,}")
+    print(f"  {'New to download:':<22} {len(pending):,}")
 
     proceed = questionary.confirm(
         f"Download {len(pending):,} new images?",
@@ -365,7 +366,7 @@ Examples:
         sys.exit(1)
 
     client = MapillaryClient(config)
-    downloader = ImageDownloader(client, output_dir=args.output_dir)
+    downloader = ImageDownloader(client, output_dir=args.output_dir / "images")
     db = DiscoveryDB.get(args.output_dir / "images.db")
 
     db_has_data = db.get_image_count() > 0
