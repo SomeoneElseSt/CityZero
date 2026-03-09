@@ -14,6 +14,9 @@ Usage:
     # With image limit (for testing)
     uv run python3 cli.py --city "San Francisco" --limit 100
 
+    # Show map preview (off by default)
+    uv run python3 cli.py --city "San Francisco" --preview
+
     # Resume without re-hitting API (default when images.db exists)
     uv run python3 cli.py --city "San Francisco" --state maintain
 
@@ -335,7 +338,7 @@ Examples:
     parser.add_argument('--limit', type=int, help='Maximum number of images to download (useful for testing)')
     parser.add_argument('--output-dir', type=Path, default=None, help=f'Output directory for images (default: {DATA_DIR}/<city>)')
     parser.add_argument('--list-cities', action='store_true', help='List available predefined cities and exit')
-    parser.add_argument('--preview', action='store_true', help='Show map preview before downloading (non-interactive mode only)')
+    parser.add_argument('--preview', action='store_true', help='Open browser map previews before downloading')
     parser.add_argument(
         '--state',
         choices=['maintain', 'merge', 'rediscover'],
@@ -347,12 +350,6 @@ Examples:
         action='store_true',
         help='Skip saving discovered image IDs to images.db (headless only)',
     )
-    parser.add_argument(
-        '--no-preview',
-        action='store_true',
-        help='Skip opening browser map previews (useful for headless/VM environments)',
-    )
-
     args = parser.parse_args()
 
     if args.list_cities:
@@ -364,7 +361,7 @@ Examples:
 
     is_interactive = not (args.city or args.bbox)
 
-    show_preview = not args.no_preview
+    show_preview = is_interactive or args.preview
 
     if is_interactive:
         bbox, location_name = interactive_mode(show_preview=show_preview)
