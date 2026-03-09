@@ -267,6 +267,7 @@ class ImageDownloader:
                     pbar.set_postfix({"found": f"{len(all_images):,}"})
                     if completed % update_interval == 0:
                         pbar.update(update_interval)
+                pbar.update(pbar.total - pbar.n)
 
         print(f"\n✓ Found {len(all_images)} unique images")
         return all_images
@@ -357,6 +358,7 @@ class ImageDownloader:
                 completed += 1
                 if completed % update_interval == 0:
                     pbar.update(update_interval)
+            pbar.update(pbar.total - pbar.n)
 
         print("\n📋 Download Summary:")
         print(f"  {'Total found:':<22} {len(all_images):,}")

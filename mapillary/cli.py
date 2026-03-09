@@ -217,8 +217,12 @@ def show_download_summary(
     print(f"   Opening in browser: {coverage_map}")
     webbrowser.open(f"file://{coverage_map}")
 
-    total = db.get_image_count()
-    downloaded_count = total - db.get_pending_count()
+    if save_to_db:
+        total = db.get_image_count()
+        downloaded_count = total - db.get_pending_count()
+    else:
+        total = len(discovered)
+        downloaded_count = total - len(pending)
     print("\n📋 Discovery Summary:")
     print(f"  {'Location:':<22} {location_name}")
     print(f"  {'Total found:':<22} {total:,}")
