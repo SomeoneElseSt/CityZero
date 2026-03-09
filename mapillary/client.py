@@ -255,6 +255,9 @@ class ImageDownloader:
 
         failed_count = 0
         success_count = 0
+        completed = 0
+        update_interval = max(1, len(images_to_download) // 100)
+        print(f"   Time estimates refresh every {update_interval} images")
 
         with tqdm(total=len(images_to_download), desc="Downloading", unit="img") as pbar:
             for img in images_to_download:
@@ -275,7 +278,9 @@ class ImageDownloader:
                 else:
                     failed_count += 1
 
-                pbar.update(1)
+                completed += 1
+                if completed % update_interval == 0:
+                    pbar.update(update_interval)
 
         print("\n" + "="*70)
         print("Download Complete")
