@@ -131,7 +131,8 @@ def warn_if_stale(db: DiscoveryDB) -> None:
         return
     age = datetime.now(timezone.utc) - last
     if age.days >= DISCOVERY_STALENESS_DAYS:
-        print(f"\n⚠️  Discovery data is {age.days} days old (>{DISCOVERY_STALENESS_DAYS} days).")
+        print()
+        print(f"⚠️ Discovery data is {age.days} days old.")
         print("   Consider --state merge or --state rediscover to refresh.")
 
 
@@ -384,11 +385,13 @@ Examples:
 
     db_has_data = db.get_image_count() > 0
     if db_has_data:
-        warn_if_stale(db)
         if is_interactive:
+            warn_if_stale(db)
             state = prompt_discovery_state()
         else:
             state = args.state or "maintain"
+            if state == "maintain":
+                warn_if_stale(db)
         save_to_db = True
     else:
         state = "rediscover"
