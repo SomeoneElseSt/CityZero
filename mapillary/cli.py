@@ -41,7 +41,7 @@ import questionary
 
 from config import get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES
 from downloader import MapillaryClient, ImageDownloader
-from db import DiscoveryDB
+from database import DiscoveryDB
 
 
 DISCOVERY_STALENESS_DAYS = 21
@@ -180,12 +180,16 @@ def show_download_summary(
             db.set_meta("bbox_north", str(bbox.north))
 
         discovery_db = db if save_to_db else None
-        downloader.discover_images(bbox, db=discovery_db)
+        discovered = downloader.discover_images(bbox, db=discovery_db)
 
         if save_to_db:
             db.set_meta("last_discovered_at", str(int(datetime.now(timezone.utc).timestamp())))
 
-    pending = db.get_pending_images_metadata()
+    if not save_to_db and state in ("merge", "rediscover"):
+        downloaded_ids = db.get_downloaded_ids()
+        pending = [img for img in discovered if img.get("id") not in downloaded_ids]
+    else:
+        pending = db.get_pending_images_metadata()
 
     if not pending:
         if db.get_image_count() > 0:
@@ -197,7 +201,16 @@ def show_download_summary(
     if max_images and len(pending) > max_images:
         pending = pending[:max_images]
 
-    heat_coords = [[img["lat"], img["lon"]] for img in pending]
+    # pending is either DB format {lat, lon} or raw API format {geometry.coordinates},
+    # depending on whether --no-save-discovery was used
+    heat_coords = []
+    for img in pending:
+        if "lat" in img:
+            heat_coords.append([img["lat"], img["lon"]])
+        else:
+            coords = img.get("geometry", {}).get("coordinates", [])
+            if len(coords) >= 2:
+                heat_coords.append([coords[1], coords[0]])
     print(f"\n📍 Generating coverage map...")
     coverage_map = generate_map_preview(bbox, location_name, heat_coords)
     print(f"   Opening in browser: {coverage_map}")

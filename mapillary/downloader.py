@@ -9,7 +9,7 @@ import requests
 from tqdm import tqdm
 
 from config import BoundingBox, MapillaryConfig, DATA_DIR
-from db import DiscoveryDB
+from database import DiscoveryDB
 
 
 MAX_RESOLUTION = 2048
