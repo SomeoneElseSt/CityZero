@@ -16,9 +16,9 @@ from database import DiscoveryDB
 MAX_RESOLUTION = 2048
 API_IMAGE_LIMIT = 2000
 # Important: lower to increase initial cell count
-GRID_CELL_SIZE = 0.2
+GRID_CELL_SIZE = 0.0002
 # Important: lower to increase resolution
-MIN_CELL_SIZE = 0.1
+MIN_CELL_SIZE = 0.0002
 DISCOVERY_WORKERS = 30
 
 OPTIONAL_FIELDS = {
