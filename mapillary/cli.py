@@ -26,6 +26,9 @@ Usage:
     # Wipe DB and discover fresh
     uv run python3 cli.py --city "San Francisco" --state rediscover
 
+    # Fine-grained discovery (finds more images, much slower)
+    uv run python3 cli.py --city "San Francisco" --granularity 80
+
     # Show available cities
     uv run python3 cli.py --list-cities
 """
@@ -42,7 +45,7 @@ import folium
 import folium.plugins
 import questionary
 
-from config import get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES
+from config import get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES, GRANULARITY_MIN, GRANULARITY_MAX, GRANULARITY_DEFAULT, granularity_to_grid_params
 from downloader import MapillaryClient, ImageDownloader
 from database import DiscoveryDB
 
@@ -265,11 +268,25 @@ def show_download_summary(
     return bool(proceed), pending
 
 
-def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str]:
+def prompt_granularity() -> int:
+    """Prompt user for discovery granularity (1–100) with guidance."""
+    print(f"\n🔬 Discovery granularity — how hard to look ({GRANULARITY_MIN}=fast, {GRANULARITY_MAX}=thorough)")
+    print(f"   Low values work best with smaller bounding boxes.")
+    print(f"   At 80+ for large areas, expect hours to days of discovery.")
+
+    raw = ask_or_exit(questionary.text(
+        f"Granularity ({GRANULARITY_MIN}–{GRANULARITY_MAX}):",
+        default=str(GRANULARITY_DEFAULT),
+        validate=lambda v: v.isdigit() and GRANULARITY_MIN <= int(v) <= GRANULARITY_MAX,
+    ))
+    return int(raw)
+
+
+def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str, int]:
     """Run interactive mode: prompt user to select city and show map preview.
 
     Returns:
-        Tuple of (BoundingBox, location_name)
+        Tuple of (BoundingBox, location_name, granularity)
     """
     print("\n" + "="*70)
     print("🗺️ CityZero Image Downloader")
@@ -304,7 +321,9 @@ def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str]:
         print(f"   Opening in browser: {map_file}")
         webbrowser.open(f"file://{map_file}")
 
-    return bbox, location_name
+    granularity = prompt_granularity()
+
+    return bbox, location_name, granularity
 
 
 def main():
@@ -351,7 +370,18 @@ Examples:
         action='store_true',
         help='Skip saving discovered image IDs to images.db (headless only)',
     )
+    parser.add_argument(
+        '--granularity',
+        type=int,
+        default=GRANULARITY_DEFAULT,
+        metavar='1-100',
+        help=f'Discovery granularity: 1 = fast/coarse, 100 = slow/thorough (default: {GRANULARITY_DEFAULT})',
+    )
     args = parser.parse_args()
+
+    if not (GRANULARITY_MIN <= args.granularity <= GRANULARITY_MAX):
+        print(f"❌ --granularity must be between {GRANULARITY_MIN} and {GRANULARITY_MAX}")
+        sys.exit(1)
 
     if args.list_cities:
         print("\n📍 Available cities:")
@@ -365,8 +395,9 @@ Examples:
     show_preview = is_interactive or args.preview
 
     if is_interactive:
-        bbox, location_name = interactive_mode(show_preview=show_preview)
+        bbox, location_name, granularity = interactive_mode(show_preview=show_preview)
     elif args.bbox:
+        granularity = args.granularity
         print(f"\n📍 Using custom bounding box")
         bbox = BoundingBox.from_string(args.bbox)
         if bbox is None:
@@ -375,6 +406,7 @@ Examples:
             sys.exit(1)
         location_name = "Custom Area"
     else:
+        granularity = args.granularity
         print(f"\n📍 Location: {args.city}")
         bbox = get_bbox_for_city(args.city)
         location_name = args.city
@@ -405,8 +437,11 @@ Examples:
         print("3. Token format: MLY|numeric_id|hex_string")
         sys.exit(1)
 
+    grid_params = granularity_to_grid_params(granularity)
+    print(f"🔬 Granularity: {granularity}/{GRANULARITY_MAX} (grid={grid_params.grid_cell_size}°, min={grid_params.min_cell_size}°)")
+
     client = MapillaryClient(config)
-    downloader = ImageDownloader(client, output_dir=args.output_dir / "images")
+    downloader = ImageDownloader(client, output_dir=args.output_dir / "images", grid_params=grid_params)
     db = DiscoveryDB.get(args.output_dir / "images.db")
 
     db_has_data = db.get_image_count() > 0

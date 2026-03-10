@@ -9,16 +9,12 @@ import mapillary.interface as mly
 import requests
 from tqdm import tqdm
 
-from config import BoundingBox, MapillaryConfig, DATA_DIR, GPS_COORD_PRECISION
+from config import BoundingBox, MapillaryConfig, GridParams, DATA_DIR, GPS_COORD_PRECISION, GRANULARITY_DEFAULT, granularity_to_grid_params
 from database import DiscoveryDB
 
 
 MAX_RESOLUTION = 2048
 API_IMAGE_LIMIT = 2000
-# Important: lower to increase initial cell count
-GRID_CELL_SIZE = 0.0002
-# Important: lower to increase resolution
-MIN_CELL_SIZE = 0.0002
 DISCOVERY_WORKERS = 30
 
 OPTIONAL_FIELDS = {
@@ -178,10 +174,11 @@ class MapillaryClient:
 class ImageDownloader:
     """Downloads Mapillary images with progress tracking."""
 
-    def __init__(self, client: MapillaryClient, output_dir: Path = DATA_DIR):
+    def __init__(self, client: MapillaryClient, output_dir: Path = DATA_DIR, grid_params: GridParams = None):
         self.client = client
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.grid = grid_params or granularity_to_grid_params(GRANULARITY_DEFAULT)
 
     def _split_cell(self, cell: BoundingBox) -> List[BoundingBox]:
         """Split a cell into 4 equal quadrants."""
@@ -201,7 +198,7 @@ class ImageDownloader:
         """
         images = self.client.get_images_in_bbox(cell, limit=API_IMAGE_LIMIT)
         cell_size = min(cell.east - cell.west, cell.north - cell.south)
-        if len(images) < API_IMAGE_LIMIT or cell_size <= MIN_CELL_SIZE:
+        if len(images) < API_IMAGE_LIMIT or cell_size <= self.grid.min_cell_size:
             return images
         all_images = []
         for sub_cell in self._split_cell(cell):
@@ -211,15 +208,16 @@ class ImageDownloader:
     def split_bbox_into_grid(self, bbox: BoundingBox) -> List[BoundingBox]:
         """Split large bounding box into smaller grid cells."""
         cells = []
-        lon_cells = int((bbox.east - bbox.west) / GRID_CELL_SIZE) + 1
-        lat_cells = int((bbox.north - bbox.south) / GRID_CELL_SIZE) + 1
+        cell_size = self.grid.grid_cell_size
+        lon_cells = int((bbox.east - bbox.west) / cell_size) + 1
+        lat_cells = int((bbox.north - bbox.south) / cell_size) + 1
 
         for i in range(lon_cells):
             for j in range(lat_cells):
-                cell_west = bbox.west + (i * GRID_CELL_SIZE)
-                cell_east = min(cell_west + GRID_CELL_SIZE, bbox.east)
-                cell_south = bbox.south + (j * GRID_CELL_SIZE)
-                cell_north = min(cell_south + GRID_CELL_SIZE, bbox.north)
+                cell_west = bbox.west + (i * cell_size)
+                cell_east = min(cell_west + cell_size, bbox.east)
+                cell_south = bbox.south + (j * cell_size)
+                cell_north = min(cell_south + cell_size, bbox.north)
 
                 cells.append(BoundingBox(
                     west=cell_west,
@@ -333,7 +331,7 @@ class ImageDownloader:
         success_count = 0
         completed = 0
         update_interval = max(1, len(images_to_download) // 100)
-        print(f"   Time estimates refresh every {update_interval} images")
+        print(f"   Time estimates refresh every {update_interval} downloaded images")
 
         with tqdm(total=len(images_to_download), desc="Downloading", unit="img") as pbar:
             for img in images_to_download:
