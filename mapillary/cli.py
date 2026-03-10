@@ -270,7 +270,7 @@ def show_download_summary(
 
 def prompt_granularity() -> int:
     """Prompt user for discovery granularity (1–100) with guidance."""
-    print(f"\n🔬 Discovery granularity — how hard to look ({GRANULARITY_MIN}=fast, {GRANULARITY_MAX}=thorough)")
+    print(f"\n📐 Discovery granularity — how hard to look ({GRANULARITY_MIN}=fast, {GRANULARITY_MAX}=thorough)")
     print(f"   Low values work best with smaller bounding boxes.")
     print(f"   At 80+ for large areas, expect hours to days of discovery.")
 
@@ -282,11 +282,11 @@ def prompt_granularity() -> int:
     return int(raw)
 
 
-def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str, int]:
+def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str]:
     """Run interactive mode: prompt user to select city and show map preview.
 
     Returns:
-        Tuple of (BoundingBox, location_name, granularity)
+        Tuple of (BoundingBox, location_name)
     """
     print("\n" + "="*70)
     print("🗺️ CityZero Image Downloader")
@@ -321,9 +321,7 @@ def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str, int]:
         print(f"   Opening in browser: {map_file}")
         webbrowser.open(f"file://{map_file}")
 
-    granularity = prompt_granularity()
-
-    return bbox, location_name, granularity
+    return bbox, location_name
 
 
 def main():
@@ -395,9 +393,8 @@ Examples:
     show_preview = is_interactive or args.preview
 
     if is_interactive:
-        bbox, location_name, granularity = interactive_mode(show_preview=show_preview)
+        bbox, location_name = interactive_mode(show_preview=show_preview)
     elif args.bbox:
-        granularity = args.granularity
         print(f"\n📍 Using custom bounding box")
         bbox = BoundingBox.from_string(args.bbox)
         if bbox is None:
@@ -406,7 +403,6 @@ Examples:
             sys.exit(1)
         location_name = "Custom Area"
     else:
-        granularity = args.granularity
         print(f"\n📍 Location: {args.city}")
         bbox = get_bbox_for_city(args.city)
         location_name = args.city
@@ -437,11 +433,8 @@ Examples:
         print("3. Token format: MLY|numeric_id|hex_string")
         sys.exit(1)
 
-    grid_params = granularity_to_grid_params(granularity)
-    print(f"🔬 Granularity: {granularity}/{GRANULARITY_MAX} (grid={grid_params.grid_cell_size}°, min={grid_params.min_cell_size}°)")
-
     client = MapillaryClient(config)
-    downloader = ImageDownloader(client, output_dir=args.output_dir / "images", grid_params=grid_params)
+    downloader = ImageDownloader(client, output_dir=args.output_dir / "images")
     db = DiscoveryDB.get(args.output_dir / "images.db")
 
     db_has_data = db.get_image_count() > 0
@@ -460,6 +453,11 @@ Examples:
         if is_interactive:
             if not ask_or_exit(questionary.confirm("Proceed with discovery?", default=True)):
                 sys.exit(0)
+
+    if state != "maintain":
+        granularity = prompt_granularity() if is_interactive else args.granularity
+        downloader.grid = granularity_to_grid_params(granularity)
+        print(f"🔬 Granularity: {granularity}/{GRANULARITY_MAX} (grid={downloader.grid.grid_cell_size}°, min={downloader.grid.min_cell_size}°)")
 
     confirmed, pending_images = show_download_summary(
         downloader, bbox, location_name, db, state, save_to_db, args.limit, is_interactive, show_preview

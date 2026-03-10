@@ -270,12 +270,18 @@ class ImageDownloader:
         return all_images
 
     def reconcile_disk_images(self, images: List[Dict], db: DiscoveryDB) -> List[Dict]:
-        """Mark images already on disk as downloaded in DB. Returns images not yet on disk."""
+        """Mark images already on disk as downloaded in DB. Returns images not yet on disk.
+
+        First reconciles the pending list against disk, then scans for any
+        orphaned files on disk that exist in the DB but weren't in the pending list.
+        """
+        pending_ids = set()
         remaining = []
         for img in images:
             img_id = img.get('id')
             if not img_id:
                 continue
+            pending_ids.add(img_id)
             output_path = self.output_dir / f"{img_id}.jpg"
             if not output_path.exists():
                 remaining.append(img)
@@ -288,6 +294,16 @@ class ImageDownloader:
             else:
                 output_path.unlink()
                 remaining.append(img)
+
+        # Reconcile orphaned disk files that are in the DB but weren't in the pending list
+        for jpg in self.output_dir.glob("*.jpg"):
+            img_id = jpg.stem
+            if img_id in pending_ids:
+                continue
+            gps = read_gps_exif(jpg)
+            if gps:
+                db.upsert_downloaded(img_id, *gps)
+
         return remaining
 
     def download_images(
