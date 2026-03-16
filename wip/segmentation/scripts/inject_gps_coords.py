@@ -111,6 +111,9 @@ def inject_gps_to_database(db_path, gps_dict):
         # (corr_data_id, corr_sensor_id, corr_sensor_type, position,
         #  position_covariance, gravity, coordinate_system)
         # Last argument is coordinate_system: 0 = WGS84, 1 = Cartesian (COLMAP enum)
+        # Note: position_covariance is set to None here. Without --overwrite_priors_covariance and
+        # --prior_position_std_* flags when running the pose prior mapper, this null value results in a zero matrix,
+        # crashing subsequent parts of the pipeline.
         inserts.append((image_id, 1, 1, position_blob, None, None, 0))
     
     print(f"Matched: {len(inserts):,} images")
