@@ -110,7 +110,8 @@ def inject_gps_to_database(db_path, gps_dict):
         # Prepare row for pose_priors table
         # (corr_data_id, corr_sensor_id, corr_sensor_type, position,
         #  position_covariance, gravity, coordinate_system)
-        inserts.append((image_id, 1, 1, position_blob, None, None, 1))
+        # Last argument is coordinate_system: 0 = WGS84, 1 = Cartesian (COLMAP enum)
+        inserts.append((image_id, 1, 1, position_blob, None, None, 0))
     
     print(f"Matched: {len(inserts):,} images")
     if unmatched:

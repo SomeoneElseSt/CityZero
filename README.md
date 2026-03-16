@@ -440,3 +440,18 @@ My current plan is: get all my assignments/academic yadayada done this week, the
 **March 15, 2025**
 
 Stats assignment took longer than expected. I have 5 days to lock-in now. 
+
+**March 16, 2026**
+
+I got to work today. I've learnt a bit about how the mapper works. Epipolar geometry, it turns out, is quite cool. It also explains where the word 'triangulation' fits in when estimating 3D points in space. 
+
+On the more practical stuff, I have found two suspects for why my previous runs with colmap's pose prior mapper haven't worked.
+1. When I injected GPS coordinates into the database, they: 
+	(i) Did not have altitude data, which might've been breaking the pose prior mapper internally if it expected 3D positions rather than mere locations. 
+	(ii) Were injected with the wrong coordinate encoding enum. Cartesian instead of WGS84, which is the format the pose prior mapper expects. 
+
+I've gone ahead and fixed the line in inject_gps_coords.py that did the injection and I ran an UPDATE on my database on Backblaze to set coordinate_system=0 for WGS84.   
+
+I'll fix these and try running the pose prior mapper, as ideally I'd rather not re-invent the wheel if not necessary, especially under the time and budget constraint.
+
+Without them though, I think training a neural network for pose estimation could be interesting. Some people have already done it but not with GPS priors. 
