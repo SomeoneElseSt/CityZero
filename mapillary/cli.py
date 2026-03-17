@@ -104,7 +104,7 @@ def generate_map_preview(
     m = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=12,
-        tiles="OpenStreetMap"
+        tiles="CartoDB positron"
     )
 
     bbox_coords = [
