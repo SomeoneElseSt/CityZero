@@ -264,9 +264,8 @@ def show_download_summary(
             if len(coords) >= 2:
                 heat_coords.append([coords[1], coords[0]])
     if show_preview:
-        print(f"\n📍 Generating coverage map...")
+        print(f"\n📍 Generating coverage heatmap for {location_name}. Opening in browser...")
         coverage_map = generate_map_preview(bbox, location_name, heat_coords)
-        print(f"   Opening in browser: {coverage_map}")
         webbrowser.open(f"file://{coverage_map}")
 
     if save_to_db:
@@ -291,7 +290,7 @@ def show_download_summary(
 
 def prompt_granularity() -> int:
     """Prompt user for discovery granularity (1–100) with guidance."""
-    print(f"\n📐 Discovery granularity — how hard to look ({GRANULARITY_MIN}=fast, {GRANULARITY_MAX}=thorough)")
+    print(f"\n📐 Discovery granularity: how many cells to split the search area into ({GRANULARITY_MIN}=fast, {GRANULARITY_MAX}=max)")
     print(f"   Low values work best with smaller bounding boxes.")
     print(f"   At 80+ for large areas, expect hours to days of discovery.")
 
@@ -309,9 +308,31 @@ def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str]:
     Returns:
         Tuple of (BoundingBox, location_name)
     """
-    print("\n" + "="*70)
-    print("🗺️ CityZero Image Downloader")
-    print("="*70)
+    A = "\033[1;38;5;73m"   # bold teal — brand accent
+    T = "\033[38;5;252m"    # light gray — body text
+    F = "\033[38;5;240m"    # dim gray — frame
+    R = "\033[0m"
+
+    w = 45                  # inner width
+    h = "─" * w
+    sp = " " * w
+
+    # visible char counts must equal w (45)
+    t1 = f"  {A}◆ CityZero Image Downloader{R}" + " " * 16       # 29 vis
+    d1 = f"  {T}Download open-source images{R}" + " " * 16        # 29 vis
+    d2 = f"  {T}of the world from Mapillary \u2014 fast.{R}" + " " * 8  # 37 vis
+
+    print()
+    print(f"  {F}╭{h}╮{R}")
+    print(f"  {F}│{R}{sp}{F}│{R}")
+    print(f"  {F}│{R}{t1}{F}│{R}")
+    print(f"  {F}├{h}┤{R}")
+    print(f"  {F}│{R}{sp}{F}│{R}")
+    print(f"  {F}│{R}{d1}{F}│{R}")
+    print(f"  {F}│{R}{d2}{F}│{R}")
+    print(f"  {F}│{R}{sp}{F}│{R}")
+    print(f"  {F}╰{h}╯{R}")
+    print()
 
     city_choices = [city.title() for city in sorted(CITY_BBOXES.keys())]
     city_choices.append("Custom bounding box...")
@@ -324,7 +345,6 @@ def interactive_mode(show_preview: bool = True) -> tuple[BoundingBox, str]:
     if selected == "Custom bounding box...":
         bbox_str = ask_or_exit(questionary.text(
             "Enter bounding box (west,south,east,north):",
-            default="-122.52,37.70,-122.35,37.83"
         ))
 
         bbox = BoundingBox.from_string(bbox_str)
@@ -449,6 +469,17 @@ Examples:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output: {args.output_dir}")
+
+    readme = args.output_dir / "README.md"
+    if not readme.exists():
+        readme.write_text(
+            f"# {location_name}\n\n"
+            "## Contents\n\n"
+            "| Path | Description |\n"
+            "| --- | --- |\n"
+            "| `images/` | Downloaded street-level images. Each file has GPS coordinates and altitude embedded in its EXIF metadata. |\n"
+            "| `images.db` | CityZero's internal state database — tracks which images have been discovered and downloaded. Do not delete or modify it; doing so will cause CityZero to re-download everything from scratch. |\n"
+        )
 
     config = get_mapillary_config()
     if config is None:
