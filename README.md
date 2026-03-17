@@ -445,7 +445,7 @@ Stats assignment took longer than expected. I have 5 days to lock-in now.
 
 I got to work today. I've learnt a bit about how the mapper works. Epipolar geometry, it turns out, is quite cool. It also explains where the word 'triangulation' fits in when estimating 3D points in space. 
 
-On the more practical stuff, I have found two suspects for why my previous runs with colmap's pose prior mapper haven't worked.
+On the more practical stuff, I have found three suspects for why my previous runs with colmap's pose prior mapper haven't worked.
 1. When I injected GPS coordinates into the database, they: 
 	(i) Did not have altitude data, which might've been breaking the pose prior mapper internally if it expected 3D positions rather than mere locations. 
 	(ii) Were injected with the wrong coordinate encoding enum. Cartesian instead of WGS84, which is the format the pose prior mapper expects. 
@@ -456,3 +456,7 @@ I've gone ahead and fixed the line in inject_gps_coords.py that did the injectio
 I'll fix these and try running the pose prior mapper, as ideally I'd rather not re-invent the wheel if not necessary, especially under the time and budget constraint.
 
 Without them though, I think training a neural network for pose estimation could be interesting. Some people have already done it but not with GPS priors. 
+
+Also, I ran some stats on the binaries of the previous run that had gotten n=502 images registered and the model was practically useless. The images occupied an area smaller than a room, i.e., were just completely stacked on each other. You could kind of see it from the polygon visualizations I made before but I thought that was a feature rather than a bug. That run is now useless, though. Time to try the pose mapper with the corrections. 
+
+TODO: download database on virtual machine or laptop and run query because libraries are all read-only, then try pose mapper again 
