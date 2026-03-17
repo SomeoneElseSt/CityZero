@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
 from typing import Dict, List, Optional
 
 import piexif
@@ -9,13 +10,13 @@ import mapillary.interface as mly
 import requests
 from tqdm import tqdm
 
-from config import BoundingBox, MapillaryConfig, GridParams, DATA_DIR, GPS_COORD_PRECISION, GRANULARITY_DEFAULT, granularity_to_grid_params
+from config import (
+    BoundingBox, MapillaryConfig, GridParams, DATA_DIR, GPS_COORD_PRECISION,
+    GRANULARITY_DEFAULT, granularity_to_grid_params,
+    MAX_RESOLUTION, API_IMAGE_LIMIT, DISCOVERY_WORKERS, DOWNLOAD_WORKERS, DB_COMMIT_BATCH,
+)
 from database import DiscoveryDB
 
-
-MAX_RESOLUTION = 2048
-API_IMAGE_LIMIT = 2000
-DISCOVERY_WORKERS = 30
 
 OPTIONAL_FIELDS = {
     'altitude': 'altitude',
@@ -158,11 +159,12 @@ class MapillaryClient:
         if response.status_code != 200:
             return False
 
+        tmp_path = output_path.with_suffix('.tmp')
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "wb") as f:
+        with open(tmp_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-
+        tmp_path.rename(output_path)
         return True
 
     def get_coverage_stats(self, bbox: BoundingBox) -> Dict:
@@ -189,6 +191,17 @@ class ImageDownloader:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.grid = grid_params or granularity_to_grid_params(GRANULARITY_DEFAULT)
+        removed = self.cleanup_tmp_files()
+        if removed:
+            print(f"⚠️  Cleaned up {removed} interrupted downloads from previous session")
+
+    def cleanup_tmp_files(self) -> int:
+        """Delete any leftover .tmp files from interrupted downloads. Returns count removed."""
+        removed = 0
+        for tmp in self.output_dir.glob("*.tmp"):
+            tmp.unlink()
+            removed += 1
+        return removed
 
     def _split_cell(self, cell: BoundingBox) -> List[BoundingBox]:
         """Split a cell into 4 equal quadrants."""
@@ -317,6 +330,73 @@ class ImageDownloader:
 
         return remaining
 
+    def download_single(self, img: Dict) -> tuple:
+        """Download one image and embed GPS EXIF if coordinates are available.
+
+        Does not touch the DB — caller flushes results in batches.
+
+        Args:
+            img: Image metadata dict from the API or DB
+
+        Returns:
+            Tuple of (status, img_id, lat, lon, altitude) where status is
+            'downloaded', 'skipped', or 'failed'
+        """
+        img_id = img.get('id')
+        if not img_id:
+            return ('failed', None, None, None, None)
+
+        output_path = self.output_dir / f"{img_id}.jpg"
+        lat_lon = extract_lat_lon(img)
+        alt = extract_altitude(img)
+
+        if not lat_lon:
+            return ('failed', img_id, None, None, None)
+
+        if output_path.exists():
+            if read_gps_exif(output_path) is None:
+                embed_gps_exif(output_path, *lat_lon, altitude=alt)
+            return ('skipped', img_id, lat_lon[0], lat_lon[1], alt)
+
+        success = self.client.download_image(
+            image_id=img_id,
+            output_path=output_path,
+            resolution=MAX_RESOLUTION
+        )
+        if not success:
+            return ('failed', img_id, None, None, None)
+
+        embed_gps_exif(output_path, *lat_lon, altitude=alt)
+        return ('downloaded', img_id, lat_lon[0], lat_lon[1], alt)
+
+    def flush_batch(self, batch: List[tuple], db: DiscoveryDB, db_lock: Lock) -> tuple[int, int]:
+        """Write a batch of download results to the DB under lock.
+
+        Args:
+            batch: List of (status, img_id, lat, lon, altitude) tuples from download_single
+            db: DiscoveryDB instance to persist results
+            db_lock: Threading lock to serialize DB writes
+
+        Returns:
+            Tuple of (successes, skipped) counts
+        """
+        successes = 0
+        skipped = 0
+        with db_lock:
+            for status, img_id, lat, lon, alt in batch:
+                if img_id is None:
+                    continue
+                if status == 'downloaded':
+                    if lat is not None:
+                        db.upsert_downloaded(img_id, lat, lon, altitude=alt)
+                    else:
+                        db.mark_downloaded(img_id)
+                    successes += 1
+                elif status == 'skipped':
+                    db.upsert_downloaded(img_id, lat, lon, altitude=alt)
+                    skipped += 1
+        return successes, skipped
+
     def download_images(
         self,
         bbox: BoundingBox,
@@ -324,7 +404,7 @@ class ImageDownloader:
         max_images: int = None,
         images: List[Dict] = None,
     ) -> Dict[str, int]:
-        """Download images. Pass `images` to skip rediscovery. Uses db for tracking."""
+        """Download images in parallel. Pass `images` to skip rediscovery. Uses db for tracking."""
         downloaded_ids = db.get_downloaded_ids()
         all_images = images if images is not None else self.discover_images(bbox)
         total_images_in_db = db.get_image_count()
@@ -350,61 +430,45 @@ class ImageDownloader:
                 'failed': 0
             }
 
+        update_interval = max(1, len(images_to_download) // 100)
         print(f"\n📥 Downloading {len(images_to_download)} images...")
         print(f"   Resolution: {MAX_RESOLUTION}px")
         print(f"   Output: {self.output_dir}")
+        print(f"   Time estimates refresh every {update_interval} images")
 
-        failed_count = 0
         success_count = 0
+        failed_count = 0
         completed = 0
-        update_interval = max(1, len(images_to_download) // 100)
-        print(f"   Time estimates refresh every {update_interval} downloaded images")
+        db_lock = Lock()
 
-        with tqdm(total=len(images_to_download), desc="Downloading", unit="img") as pbar:
-            for img in images_to_download:
-                img_id = img.get('id')
-                if not img_id:
-                    continue
-
-                output_path = self.output_dir / f"{img_id}.jpg"
-                if output_path.exists():
-                    lat_lon = extract_lat_lon(img)
-                    if lat_lon:
-                        # Embed GPS if missing — use img coords (full precision, not EXIF round-trip)
-                        alt = extract_altitude(img)
-                        if read_gps_exif(output_path) is None:
-                            embed_gps_exif(output_path, *lat_lon, altitude=alt)
-                        db.upsert_downloaded(img_id, *lat_lon, altitude=alt)
-                        skipped_count += 1
-                        completed += 1
-                        continue
-                    else:
-                        # No coords anywhere — delete so it gets re-downloaded fresh
-                        output_path.unlink()
-
-                success = self.client.download_image(
-                    image_id=img_id,
-                    output_path=output_path,
-                    resolution=MAX_RESOLUTION
-                )
-
-                if success:
-                    lat_lon = extract_lat_lon(img)
-                    alt = extract_altitude(img)
-                    if lat_lon:
-                        embed_gps_exif(output_path, *lat_lon, altitude=alt)
-                    db.mark_downloaded(img_id)
-                    success_count += 1
-                else:
-                    failed_count += 1
-
-                completed += 1
-                if completed % update_interval == 0:
-                    pbar.update(update_interval)
-            pbar.update(pbar.total - pbar.n)
+        with ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as executor:
+            futures = {executor.submit(self.download_single, img): img for img in images_to_download}
+            batch = []
+            with tqdm(total=len(images_to_download), desc="Downloading", unit="img") as pbar:
+                for future in as_completed(futures):
+                    result = future.result()
+                    status = result[0]
+                    if status == 'failed':
+                        failed_count += 1
+                    batch.append(result)
+                    completed += 1
+                    pbar.n = completed
+                    if completed % update_interval == 0:
+                        pbar.refresh()
+                        pbar.set_postfix({"failed": failed_count})
+                    if len(batch) >= DB_COMMIT_BATCH:
+                        s, sk = self.flush_batch(batch, db, db_lock)
+                        success_count += s
+                        skipped_count += sk
+                        batch.clear()
+                pbar.update(pbar.total - pbar.n)
+            if batch:
+                s, sk = self.flush_batch(batch, db, db_lock)
+                success_count += s
+                skipped_count += sk
 
         total_downloaded = len(db.get_downloaded_ids())
-        
+
         print("\n📋 Download Summary:")
         print(f"  {'Discovered Images:':<22} {total_images_in_db:,}")
         print(f"  {'Existing Downloads:':<22} {already_had_at_start:,}")
