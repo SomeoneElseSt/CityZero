@@ -5,7 +5,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple
-
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -21,6 +20,16 @@ DATA_DIR = Path.cwd()
 # 10^7 = 7 decimal places (~1cm); fits in uint32 for both lat and lon.
 GPS_COORD_PRECISION = 10_000_000
 
+# Downloader / API constants
+MAX_RESOLUTION = 2048
+API_IMAGE_LIMIT = 2000
+DISCOVERY_WORKERS = 30
+DOWNLOAD_WORKERS = 10
+DB_COMMIT_BATCH = 50
+DISCOVERY_STALENESS_DAYS = 21
+GRANULARITY_MIN = 1
+GRANULARITY_MAX = 100
+GRANULARITY_DEFAULT = 25
 
 @dataclass
 class MapillaryConfig:
@@ -61,12 +70,6 @@ def get_mapillary_config() -> MapillaryConfig | None:
         return None
     return MapillaryConfig(client_token=token)
 
-
-GRANULARITY_MIN = 1
-GRANULARITY_MAX = 100
-GRANULARITY_DEFAULT = 25
-
-
 @dataclass
 class GridParams:
     """Grid cell sizes derived from a granularity level."""
@@ -80,15 +83,6 @@ def granularity_to_grid_params(level: int) -> GridParams:
     grid = 0.5 * math.pow(0.0004, t)
     min_cell = 0.25 * math.pow(0.0008, t)
     return GridParams(grid_cell_size=round(grid, 6), min_cell_size=round(min_cell, 6))
-
-
-# Downloader / API constants
-MAX_RESOLUTION = 2048
-API_IMAGE_LIMIT = 2000
-DISCOVERY_WORKERS = 30
-DOWNLOAD_WORKERS = 10
-DB_COMMIT_BATCH = 50
-DISCOVERY_STALENESS_DAYS = 21
 
 # Predefined city bounding boxes (can be extended)
 CITY_BBOXES: dict[str, BoundingBox] = {
