@@ -402,6 +402,10 @@ Examples:
         print(f"❌ --granularity must be between {GRANULARITY_MIN} and {GRANULARITY_MAX}")
         sys.exit(1)
 
+    if args.limit is not None and args.limit < 1:
+        print("❌ --limit must be >= 1")
+        sys.exit(1)
+
     if args.list_cities:
         print("\n📍 Available cities:")
         for city in sorted(CITY_BBOXES.keys()):
