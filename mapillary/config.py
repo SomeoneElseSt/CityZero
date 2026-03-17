@@ -82,6 +82,14 @@ def granularity_to_grid_params(level: int) -> GridParams:
     return GridParams(grid_cell_size=round(grid, 6), min_cell_size=round(min_cell, 6))
 
 
+# Downloader / API constants
+MAX_RESOLUTION = 2048
+API_IMAGE_LIMIT = 2000
+DISCOVERY_WORKERS = 30
+DOWNLOAD_WORKERS = 10
+DB_COMMIT_BATCH = 50
+DISCOVERY_STALENESS_DAYS = 21
+
 # Predefined city bounding boxes (can be extended)
 CITY_BBOXES: dict[str, BoundingBox] = {
     "san francisco": BoundingBox(

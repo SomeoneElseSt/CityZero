@@ -45,12 +45,15 @@ import folium
 import folium.plugins
 import questionary
 
-from config import get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES, GRANULARITY_MIN, GRANULARITY_MAX, GRANULARITY_DEFAULT, granularity_to_grid_params
+from config import (
+    get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES,
+    GRANULARITY_MIN, GRANULARITY_MAX, GRANULARITY_DEFAULT, granularity_to_grid_params,
+    DISCOVERY_STALENESS_DAYS,
+)
 from downloader import MapillaryClient, ImageDownloader
 from database import DiscoveryDB
 
 
-DISCOVERY_STALENESS_DAYS = 21
 
 
 def ask_or_exit(question):
