@@ -460,3 +460,9 @@ Without them though, I think training a neural network for pose estimation could
 Also, I ran some stats on the binaries of the previous run that had gotten n=502 images registered and the model was practically useless. The images occupied an area smaller than a room, i.e., were just completely stacked on each other. You could kind of see it from the polygon visualizations I made before but I thought that was a feature rather than a bug. That run is now useless, though. Time to try the pose mapper with the corrections. 
 
 TODO: download database on virtual machine or laptop and run query because libraries are all read-only, then try pose mapper again 
+
+**March 17, 2026**
+
+Today was productive. I had to download the database to inject altitude coordinates and update the coordinate encoding enum. I also updated the Mapillary CLI to be more robust, and much faster with 40 pooled workers for both discovering and downloading images, among other things. It's seriously fast.
+
+Now I just need to test the pose prior mapper on a proper GPU. I'll need credits for that. Might do a quick run with my own on Runpod or Vast.
