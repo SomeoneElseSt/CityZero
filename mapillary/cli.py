@@ -46,7 +46,7 @@ import folium.plugins
 import questionary
 
 from config import (
-    get_mapillary_config, BoundingBox, DATA_DIR, CITY_BBOXES,
+    get_mapillary_config, BoundingBox, CITY_BBOXES,
     GRANULARITY_MIN, GRANULARITY_MAX, GRANULARITY_DEFAULT, granularity_to_grid_params,
     DISCOVERY_STALENESS_DAYS,
 )
@@ -62,6 +62,24 @@ def ask_or_exit(question):
     if answer is None:
         sys.exit(0)
     return answer
+
+
+def next_bbox_dir(cwd: Path) -> Path:
+    """Return cwd/bboxN where N is the next available number.
+
+    Scans cwd for existing bbox1, bbox2, ... folders and returns the next
+    unused number.
+
+    Args:
+        cwd: Directory to scan for existing bbox folders.
+
+    Returns:
+        Path to the next bbox directory (e.g. cwd/bbox1, cwd/bbox3).
+    """
+    n = 1
+    while (cwd / f"bbox{n}").exists():
+        n += 1
+    return cwd / f"bbox{n}"
 
 
 def get_bbox_for_city(city_name: str) -> BoundingBox:
@@ -357,7 +375,7 @@ Examples:
     parser.add_argument('--city', type=str, help='City name (enables non-interactive mode)')
     parser.add_argument('--bbox', type=str, help='Custom bounding box as "west,south,east,north" (overrides --city)')
     parser.add_argument('--limit', type=int, help='Maximum number of images to download (useful for testing)')
-    parser.add_argument('--output-dir', type=Path, default=None, help=f'Output directory for images (default: {DATA_DIR}/<city>)')
+    parser.add_argument('--output-dir', type=Path, default=None, help='Output directory for images (default: <city> or bbox# in cwd)')
     parser.add_argument('--list-cities', action='store_true', help='List available predefined cities and exit')
     parser.add_argument('--preview', action='store_true', help='Open browser map previews before downloading')
     parser.add_argument(
@@ -418,11 +436,12 @@ Examples:
         input("\nPress Enter to continue...")
 
     if args.output_dir is None:
+        cwd = Path.cwd()
         if location_name == "Custom Area":
-            args.output_dir = DATA_DIR
+            args.output_dir = next_bbox_dir(cwd)
         else:
             normalized = location_name.lower().replace(" ", "_")
-            args.output_dir = DATA_DIR / normalized
+            args.output_dir = cwd / normalized
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output: {args.output_dir}")

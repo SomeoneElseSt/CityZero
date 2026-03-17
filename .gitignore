@@ -24,6 +24,7 @@ ENV/
 
 # Data directories
 data/*
+bbox*/
 wip/db_info/
 wip/segmentation/outputs/
 wip/binaries/

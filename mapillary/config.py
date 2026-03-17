@@ -14,8 +14,8 @@ load_dotenv()
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
 
-# Data directory
-DATA_DIR = PROJECT_ROOT / "data"
+# Data directory (default for programmatic use)
+DATA_DIR = Path.cwd()
 
 # Normalizes DB and EXIF coords to the same precision so == comparisons work exactly.
 # 10^7 = 7 decimal places (~1cm); fits in uint32 for both lat and lon.

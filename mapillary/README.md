@@ -36,7 +36,7 @@ Options:
   --city NAME           Download from a predefined city
   --bbox W,S,E,N        Custom bounding box (overrides --city)
   --limit N             Cap the number of images to download
-  --output-dir PATH     Output directory (default: data/<city>)
+  --output-dir PATH     Output directory (default: <city> or bbox# in current directory)
   --preview             Open an interactive map in the browser before downloading
   --state STATE         Discovery state when resuming: maintain | merge | rediscover
   --no-save-discovery   Don't persist discovered IDs to the database
