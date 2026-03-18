@@ -466,3 +466,7 @@ TODO: download database on virtual machine or laptop and run query because libra
 Today was productive. I had to download the database to inject altitude coordinates and update the coordinate encoding enum. I also updated the Mapillary CLI to be more robust, and much faster with 40 pooled workers for both discovering and downloading images, among other things. It's seriously fast.
 
 Now I just need to test the pose prior mapper on a proper GPU. I'll need credits for that. Might do a quick run with my own on Runpod or Vast.
+
+**March 18, 2026**
+
+Ouch. I somehow got an abscess after yesterday. Will take sometime to recover. I've seen some good rigs on Vast though, will try to set one up tomorrow and leave it running. 
