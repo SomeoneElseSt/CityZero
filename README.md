@@ -470,3 +470,7 @@ Now I just need to test the pose prior mapper on a proper GPU. I'll need credits
 **March 18, 2026**
 
 Ouch. I somehow got an abscess after yesterday. Will take sometime to recover. I've seen some good rigs on Vast though, will try to set one up tomorrow and leave it running. 
+
+**March 19, 2026**
+
+I rented a 5060 Ti and have the pose prior mapper running on it - my plan is, let it run for ~2 days, if it makes snapshots with good stats, keep it running and kill it otherwise. 
