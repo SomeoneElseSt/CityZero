@@ -91,7 +91,7 @@ def reconstruction(database_path, image_path, output_path, image_list_path, snap
         "--overwrite_priors_covariance", "1",   # Overwrite null covariance from database
         "--prior_position_std_x", "1.0",         # Position covariance std dev (meters)
         "--prior_position_std_y", "1.0",         # Without these flags, position_covariance is read as null
-        "--prior_position_std_z", "50.0",        # and results in a zero matrix, crashing subsequent parts of the pipeline
+        "--prior_position_std_z", "10.0",        # and results in a zero matrix, crashing subsequent parts of the pipeline
         # "--Mapper.init_min_num_inliers", "300",        # Most samples have 30+ inliers. This should constrain the starting pairs to the 10% (700k+) pairs with 300+ inliers. 
         # "--Mapper.init_max_forward_motion", "0.3",     # Should be stricter about having the initial pairs be separate from each other, rather than, for example, a picture of two very-similar looking houses facing forwards (this should have it see the features are different thanks to the angular separation)
         # "--Mapper.init_num_trials", "400",             # I saw many initial matches fail a lot, and even at 200 min_inliers there are plenty, so it's good to try lots for redundancy 

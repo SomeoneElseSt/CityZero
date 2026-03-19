@@ -102,8 +102,11 @@ def install_dependencies() -> None:
         "qt6-base-dev",
         "libqt6opengl6-dev",
         "libqt6openglwidgets6",
-        "nvidia-cuda-toolkit",
-        "nvidia-cuda-toolkit-gcc",
+        # NOTE: vast.ai instances have CUDA pre-installed at /usr/local/cuda.
+        # Installing nvidia-cuda-toolkit from apt brings an old nvcc (12.0) that
+        # conflicts with Ubuntu 24.04 glibc (_Float32/_Float64 errors). Skipping whilst on Vast.
+        # "nvidia-cuda-toolkit",
+        # "nvidia-cuda-toolkit-gcc",
         # Non-COLMAP but useful libraries
         "micro",
         "sqlite3",
