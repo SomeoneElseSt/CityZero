@@ -474,3 +474,22 @@ Ouch. I somehow got an abscess after yesterday. Will take sometime to recover. I
 **March 19, 2026**
 
 I rented a 5060 Ti and have the pose prior mapper running on it - my plan is, let it run for ~2 days, if it makes snapshots with good stats, keep it running and kill it otherwise. 
+
+**March 20, 2026**
+It ran through the night. It's rather strange: it made [almost] the exact same binaries as my previous run. It doesn't make sense because supposedly the initial pair initialization is supposed to be random. Unless some parts of it are deterministic and always disregard some pairs, always include some, etc.
+
+I've still got the GPU, so I'll do another run but providing it the two seed images manually. I'll pick some in the intersection of the neighborhood. I'll also look inside the colmap repo to find how it picks two images to initialize.
+
+Update #1: it turns out colmap arbitrarily picks by greatest feature match count. In fact, the pose prior mapper doesn't use GPS locations until it does bundle optimization. It's a dead end. GPS locations are only used for adjusting scale, not picking images. On top of that if the images it picks are in a straight line it can't do BA because it needs at least 3 camera positions not in a straight line - the binary it made has all camera positions in a straight line on each cluster, so this wouldn't have worked regardless. 
+
+I'll try different initialization pairs and see if that works.
+
+Update #2: I've been querying the database to find two good starting pair images and noticed something. It turns out, my images with the highest count of inlier matches both have giant digital banners of some drive-by company occupying about 30% of the image. I.e., they're not real matches. The banner artificially makes it seem that way. I thought this was accounted for in some colmap setting I had a while back but apparently not. 
+
+I think I'll purge the database + images from anything with >= 500 inlier matches. It's not that many either way and I don't want it messing up with the pipeline later on. 
+
+Then I'll run spatial queries for images that have 200 >= x >= 100 inlier matches and are close to each other to find a more suitable pair. 
+
+I have rather bad stomachaches because of antibiotics so for the time being I'll stop the current run, rest for a bit, then do the above. 
+
+Also, a mental note: only counting inliers from the database without geo constraints or checking them by eye is naive when dealing with data of unknown origin. 
