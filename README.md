@@ -505,3 +505,5 @@ I ran a script to filter the database to only include images with >= 200 inlier 
 ![Previewing two high inlier count Mapillary frames side by side in-terminal with catimg (`1424487217912205.jpg` and `4002684933179995.jpg`).](./assets/debugging/catimg-mapillary-pair-preview.png)
 
 They look similar enough to each other with some difference. I think it's a good starting point. 
+
+Update #4: This run failed also. Colmap rejected my pair outright, tried some others and didn't end up accepting them. I'll terminate the instance for now and debug whether it's a DB issue or something else.  
