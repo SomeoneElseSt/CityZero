@@ -36,7 +36,16 @@ import sys
 from datetime import datetime
 
 
-def reconstruction(database_path, image_path, output_path, image_list_path, snapshot_path, snapshot_frames_freq) -> None:
+def reconstruction(
+    database_path,
+    image_path,
+    output_path,
+    image_list_path,
+    snapshot_path,
+    snapshot_frames_freq,
+    init_image1=None,
+    init_image2=None,
+) -> None:
 
     if database_path is None or not database_path:
         print("Database Path is None. Please provide a valid database path")
@@ -100,6 +109,19 @@ def reconstruction(database_path, image_path, output_path, image_list_path, snap
         # "--Mapper.abs_pose_min_num_inliers", "80",     # Too many images are 30+ inliers, so this should cut down on easy matches and barely related images
     ]
 
+    if (init_image1 is None) != (init_image2 is None):
+        print("Both init_image1 and init_image2 must be provided together, or omit both.")
+        sys.exit(1)
+    if init_image1 is not None:
+        cmd.extend(
+            [
+                "--Mapper.init_image_id1",
+                str(init_image1),
+                "--Mapper.init_image_id2",
+                str(init_image2),
+            ]
+        )
+
     with open(log_file_path, 'w') as log_file:
         try:
             result = subprocess.run(cmd, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -159,6 +181,18 @@ if __name__ == "__main__":
         required=True,
         help="Number of frames registered needed to save snapshot"
     )
+    parser.add_argument(
+        "--init_image1",
+        type=int,
+        default=None,
+        help="Use with --init_image2: passed as --Mapper.init_image_id1 (both required together)",
+    )
+    parser.add_argument(
+        "--init_image2",
+        type=int,
+        default=None,
+        help="Use with --init_image1: passed as --Mapper.init_image_id2 (both required together)",
+    )
 
     args = parser.parse_args()
 
@@ -168,5 +202,7 @@ if __name__ == "__main__":
         args.output_path,
         args.image_list_path,
         args.snapshot_path,
-        args.snapshot_frames_freq
+        args.snapshot_frames_freq,
+        args.init_image1,
+        args.init_image2,
     )
