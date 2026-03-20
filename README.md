@@ -493,3 +493,15 @@ Then I'll run spatial queries for images that have 200 >= x >= 100 inlier matche
 I have rather bad stomachaches because of antibiotics so for the time being I'll stop the current run, rest for a bit, then do the above. 
 
 Also, a mental note: only counting inliers from the database without geo constraints or checking them by eye is naive when dealing with data of unknown origin. 
+
+I'm also thinking whether it'd be worth it to find and use a ML model/neural network for watermark/non-watermark classification. Not all watermarks are the same so, maybe pre-filtering them and deleting them from the DB and images is a good idea. 
+
+Update #3: Doing the pruning now. 
+
+I had a thought. If I were to rebuild the mapper, I'd make it so whenever it adds a new image it's constrained to try all the images with >= 200/100/50 inlier matches, (drops brackets if none at the prev. bracket are found) add one within 10/20/50m (closest and highest matches is ideal) instead of just by matches.  
+
+I ran a script to filter the database to only include images with >= 200 inlier matches that are within 50m of each other and visually inspected the pairs it found. I took a screenshot of the pair I'll use to do a new run, setting them as seed images.
+
+![Previewing two high inlier count Mapillary frames side by side in-terminal with catimg (`1424487217912205.jpg` and `4002684933179995.jpg`).](./assets/debugging/catimg-mapillary-pair-preview.png)
+
+They look similar enough to each other with some difference. I think it's a good starting point. 
