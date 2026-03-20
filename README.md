@@ -507,3 +507,5 @@ I ran a script to filter the database to only include images with >= 200 inlier 
 They look similar enough to each other with some difference. I think it's a good starting point. 
 
 Update #4: This run failed also. Colmap rejected my pair outright, tried some others and didn't end up accepting them. I'll terminate the instance for now and debug whether it's a DB issue or something else.  
+
+Update #5: I found out the reason why it failed is because COLMAP originally determined the two images to be panoramic, i.e., to share the same center. Technically correct, but what I didn’t know is that this triggers a failure mode in an internal calculation for a triangulation angle. So, tomorrow I’ll find two images that look at the same thing but with lateral displacement (different angles) and try again.

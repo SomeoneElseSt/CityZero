@@ -33,7 +33,7 @@ cur.execute("""
     FROM two_view_geometries tvg
     JOIN images i1 ON i1.image_id = tvg.pair_id / 2147483647
     JOIN images i2 ON i2.image_id = tvg.pair_id % 2147483647
-    WHERE tvg.rows >= 100 AND tvg.rows < 200
+    WHERE tvg.rows >= 100 AND tvg.rows < 200 AND tvg.config != 3
 """)
 
 results = []
