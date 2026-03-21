@@ -509,3 +509,17 @@ They look similar enough to each other with some difference. I think it's a good
 Update #4: This run failed also. Colmap rejected my pair outright, tried some others and didn't end up accepting them. I'll terminate the instance for now and debug whether it's a DB issue or something else.  
 
 Update #5: I found out the reason why it failed is because COLMAP originally determined the two images to be panoramic, i.e., to share the same center. Technically correct, but what I didn’t know is that this triggers a failure mode in an internal calculation for a triangulation angle. So, tomorrow I’ll find two images that look at the same thing but with lateral displacement (different angles) and try again.
+
+**March 21, 2026*
+
+I think I've exhausted all possible ways to make COLMAP work now. I've been trying to find two suitable seed pairs for the last couple of hours and am noticing the overwhelming majority of images on Mapillary are just dashcam footage.
+
+Now, that doesn't necessarily mean the data is wrong. If I can mentally see two dashcam pictures and be able to draw a rough approximation of what a scene looks like, that should be fine.
+
+However, COLMAP necessarily needs them to not be facing at the same center due to the way it's designed. I.e., my dashcam images are basically useless.
+
+And most of the high match count ones are those! I've been running some SQL queries to find geo-bounded image pairs that have between 300 and 500 matches. Five of those pairs are the same dashcam pictures of someone on a motorcycle wearing a high-contrast outfit that I'm guessing the matcher picks up as a very strong feature.
+
+I think internally COLMAP selects which image to add next to the existing reconstruction the same way, so even if I do find two suitable pairs, most of the data just isn't cut out for their pipeline.
+
+Yeah, ok, I'm tired of patching around COLMAP. It's time to pivot.
