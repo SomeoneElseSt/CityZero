@@ -1,6 +1,7 @@
 
 # Agents
 CLAUDE.md
+.context/
 
 # Private (keys, credentials, tokens, backblaze)
 wip/private/
