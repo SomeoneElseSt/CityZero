@@ -168,7 +168,7 @@ def build_ceres_with_cuda() -> None:
     print("Removing CUDA 13 cuDSS packages to avoid libcublas.so.13 conflicts...")
     cuda13_packages = [
         "cudss-cuda-13",
-        "libcudss0-cuda-13", 
+        "libcudss0-cuda-13",
         "libcudss0-dev-cuda-13",
         "libcudss0-static-cuda-13"
     ]
@@ -177,7 +177,16 @@ def build_ceres_with_cuda() -> None:
         "Failed to remove CUDA 13 packages",
         env=env
     )
-    
+
+    print("Installing CUDA math dev libraries (cublas, cusolver, cusparse, curand)...")
+    cuda_math_pkgs = resolve_cuda_math_dev_packages()
+    print(f"  Packages: {' '.join(cuda_math_pkgs)}")
+    run_command(
+        ["sudo", "apt-get", "-y", "install"] + cuda_math_pkgs,
+        f"Failed to install CUDA math dev packages",
+        env=env,
+    )
+
     print("Building Ceres Solver from source with CUDA and cuDSS support")
     
     ceres_dir = Path.home() / "ceres-solver"
@@ -221,7 +230,9 @@ def build_ceres_with_cuda() -> None:
         "-DCMAKE_BUILD_TYPE=Release",
         "-DUSE_CUDA=ON",
         "-DCMAKE_CUDA_ARCHITECTURES=80",
-        "-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/libcudss/12/cmake/cudss",
+        "-DCMAKE_CUDA_COMPILER=" + nvcc_path,
+        "-DCUDAToolkit_ROOT=/usr/local/cuda",
+        "-DCMAKE_PREFIX_PATH=/usr/local/cuda;/usr/lib/x86_64-linux-gnu/libcudss/12/cmake/cudss",
         "-DBUILD_SHARED_LIBS=ON",
         "-DBUILD_TESTING=OFF",
         "-DBUILD_EXAMPLES=OFF",
@@ -255,12 +266,38 @@ def build_ceres_with_cuda() -> None:
     print("Ceres Solver installed successfully")
 
 
+def resolve_cuda_math_dev_packages() -> list[str]:
+    """Return versioned apt package names for CUDA math libs required by Ceres and COLMAP."""
+    cuda_math_libs = [
+        "libcublas-dev",
+        "libcusolver-dev",
+        "libcusparse-dev",
+        "libcurand-dev",
+        "libnvjitlink",
+        "libnvjitlink-dev",
+    ]
+
+    nvcc = Path("/usr/local/cuda/bin/nvcc")
+    if not nvcc.exists():
+        return cuda_math_libs
+
+    result = subprocess.run([str(nvcc), "--version"], capture_output=True, text=True)
+    # nvcc output: "release 12.9, V12.9.86"
+    for token in result.stdout.split():
+        if token.startswith("V"):
+            parts = token[1:].split(".")
+            if len(parts) >= 2:
+                suffix = f"-{parts[0]}-{parts[1]}"
+                return [lib + suffix for lib in cuda_math_libs]
+
+    return cuda_math_libs
+
+
 def resolve_nvcc_path() -> str | None:
     """Find nvcc compiler path."""
     local_nvcc = Path("/usr/local/cuda/bin/nvcc")
     if local_nvcc.exists():
         return str(local_nvcc)
-
 
     apt_nvcc = Path("/usr/bin/nvcc")
     if apt_nvcc.exists():
@@ -271,6 +308,20 @@ def resolve_nvcc_path() -> str | None:
         return found
 
     return None
+
+
+def register_cuda_libs_with_ldconfig() -> None:
+    """Add CUDA lib dir to ldconfig so libnvJitLink and friends are found at link time."""
+    cuda_lib_dir = "/usr/local/cuda/targets/x86_64-linux/lib"
+    conf_file = Path("/etc/ld.so.conf.d/cuda-local.conf")
+    if not conf_file.exists():
+        print(f"Registering {cuda_lib_dir} with ldconfig...")
+        run_command(
+            ["sudo", "bash", "-c", f"echo '{cuda_lib_dir}' > {conf_file}"],
+            "Failed to write cuda ldconfig entry",
+            shell=False,
+        )
+    run_command(["sudo", "ldconfig"], "ldconfig failed", continue_on_error=True)
 
 
 def build_colmap_from_source() -> None:
@@ -289,6 +340,8 @@ def build_colmap_from_source() -> None:
 
     build_dir = colmap_dir / "build"
     build_dir.mkdir(exist_ok=True)
+
+    register_cuda_libs_with_ldconfig()
 
     print("\nConfiguring COLMAP with CMake...")
     nvcc_path = resolve_nvcc_path()

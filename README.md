@@ -523,3 +523,9 @@ And most of the high match count ones are those! I've been running some SQL quer
 I think internally COLMAP selects which image to add next to the existing reconstruction the same way, so even if I do find two suitable pairs, most of the data just isn't cut out for their pipeline.
 
 Yeah, ok, I'm tired of patching around COLMAP. It's time to pivot.
+
+**March 26, 2026**
+
+Today I downloaded the full image tar into a VM, made a copy of the images I'm using for my Sunset District experiments, and uploaded them as a tar to backblaze. It turns out they're only 10GB! So instead of waiting an hour to download all 160GB images now it should be a snappy 10min whenever I'm starting on a fresh VM.
+
+That is good but RAM consumption didn't change as I hoped it would. It still needs at minimum 60gb of RAM to load [presumably] the DB + images into memory.
