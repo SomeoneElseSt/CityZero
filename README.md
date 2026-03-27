@@ -539,22 +539,3 @@ I've begun looking at a new architecture, it seems promising. I don't think I wa
 I won't log my work here nor commit the code publicly, but I do want to keep this updated. I'm setting up a Github action so that each time I add a new commit to a separate log in my private repo it adds a public hash here w/timestamped blobs of the log and code at that time inside a entries/ and working/ folder respectively. It'll look something like the usual date stamp I place in these logs with Log: '{log_hash}', Code: '{code_hash}' below it. 
 
 I made a test run shown below. The folder blobs/ stores the .age files for the code and log at each sealed date. 
-
-**March 28, 2026**
-
-Log: '025376e9535c388abaca7834bd1441eef5bc9bdd295666d55ada1f2c846d694b', Code: '2644c1c3d86eced4865d80cfa73d78232fe5b71f'.
-
-**March 28, 2026**
-
-Log: '025376e9535c388abaca7834bd1441eef5bc9bdd295666d55ada1f2c846d694b'.
-Code: 'da8a03f50616fc97bd04770235ace7037deeb692'.
-
-**March 28, 2026**
-
-Log: '56c512627408067b968be5de3fcb4a62efe1c8adc0ca05ab0f9d352091433aef'.
-Code: 'da8a03f50616fc97bd04770235ace7037deeb692'.
-
-**March 28, 2026**
-
-Log: '0688d6f9bbf759aff45f30846253ae9e710ebc61df9c964eb9c2071ac34ddf12'.
-Code: 'ce42c3e588e99ed8db1f1d8bbe9e9de64608809c'.
