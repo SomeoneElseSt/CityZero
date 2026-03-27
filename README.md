@@ -536,7 +536,7 @@ I've begun looking at a new architecture, it seems promising. I don't think I wa
 
 **March 28, 2026**
 
-I won't log my work here nor commit the code publicly, but I do want to keep this updated. I'm setting up a Github action each time I add a new commit to a separate log in my private repo it adds a public hash here w/timestamped blobs of the log and code at that time inside a entries/ and working/ folder. It'll look something like:
+I won't log my work here nor commit the code publicly, but I do want to keep this updated. I'm setting up a Github action so thateach time I add a new commit to a separate log in my private repo it adds a public hash here w/timestamped blobs of the log and code at that time inside a entries/ and working/ folder. It'll look something like:
 
-**{MM} {DD}, {YYYY}**
+**{MM} {DD}, {YYYY}**\n
 Log: '{log_hash}', Code: '{code_hash}'.
