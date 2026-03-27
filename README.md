@@ -555,9 +555,6 @@ To verify a sealed entry, you'd need the private key to decrypt `entry.age` or `
 [ "$(age -d -i PRIVATE_KEY blobs/YYYY-MM-DD/code.age | shasum -a 256 | awk '{print $1}')" = "EXPECTED_CODE_HASH" ] && echo True || echo False
 ```
 
-The public age key used to encrypt the blobs is `age1ujkp0tjsa85qmrxteyxjyae94tj59gcdquwhncmxu8vcw3y0zexsq3qrll`.
-
-
 **March 28, 2026**
 
 Log: 'dc0adf914147b161f63538fd00e4d0a0ed721f1e88860f24e6414c712df85891'.
