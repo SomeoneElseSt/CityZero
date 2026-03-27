@@ -536,12 +536,14 @@ I've begun looking at a new architecture, it seems promising. I don't think I wa
 
 **March 28, 2026**
 
-I won't log my work here nor commit the code publicly, but I do want to keep this updated. I'm setting up a Github action so that each time I add a new commit to a separate log in my private repo it adds a public hash here w/timestamped blobs of the log and code at that time inside a entries/ and working/ folder respectively. It'll look something like the usual date stamp I place in these logs with Log: '{log_hash}', Code: '{code_hash}' below it. 
+I won't log my work here nor commit the code publicly, but I do want to keep this updated. I've set up a GitHub Action that triggers on every push to my private log — it encrypts the full log and a code snapshot using [age](https://github.com/FiloSottile/age) and commits both blobs to this repo atomically, along with a hash row like the one below.
 
-I made a test run shown below. The folder blobs/ stores the .age files for the code and log at each sealed date. 
+The `blobs/` folder stores the `.age` files for each sealed date. Each entry looks like:
 
-**March 28, 2026**
+```
+Log: '{sha256_of_plaintext_log}'
+Code: '{sha256_of_plaintext_code_archive}'
+```
 
-Log: 'cb8e9aa13369dbf3ff3251c566018fe1e9b60f2d6e7fc264b295f74b92301b20'.
+To verify a sealed entry, you'd need the private key to decrypt `entry.age` or `code.age`, then SHA-256 hash the plaintext and compare it against the corresponding public hash. If they're a match, it proves the content existed unchanged on that date. The public age key used to encrypt the blobs is `age1ujkp0tjsa85qmrxteyxjyae94tj59gcdquwhncmxu8vcw3y0zexsq3qrll`.
 
-Code: 'aec8437abd42bd825e57b06ed287d83c869a404d'.
