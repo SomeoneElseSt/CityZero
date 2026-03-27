@@ -545,7 +545,17 @@ Log: '{sha256_of_plaintext_log}'
 Code: '{sha256_of_plaintext_code_archive}'
 ```
 
-To verify a sealed entry, you'd need the private key to decrypt `entry.age` or `code.age`, then SHA-256 hash the plaintext and compare it against the corresponding public hash. If they're a match, it proves the content existed unchanged on that date. The public age key used to encrypt the blobs is `age1ujkp0tjsa85qmrxteyxjyae94tj59gcdquwhncmxu8vcw3y0zexsq3qrll`.
+To verify a sealed entry, you'd need the private key to decrypt `entry.age` or `code.age`, then SHA-256 hash the plaintext and compare it against the corresponding public hash. If `True`, it proves the content existed unchanged on that date.
+
+```bash
+# Log
+[ "$(age -d -i PRIVATE_KEY blobs/YYYY-MM-DD/entry.age | shasum -a 256 | awk '{print $1}')" = "EXPECTED_LOG_HASH" ] && echo True || echo False
+
+# Code
+[ "$(age -d -i PRIVATE_KEY blobs/YYYY-MM-DD/code.age | shasum -a 256 | awk '{print $1}')" = "EXPECTED_CODE_HASH" ] && echo True || echo False
+```
+
+The public age key used to encrypt the blobs is `age1ujkp0tjsa85qmrxteyxjyae94tj59gcdquwhncmxu8vcw3y0zexsq3qrll`.
 
 
 **March 28, 2026**
