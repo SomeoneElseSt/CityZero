@@ -529,3 +529,7 @@ Yeah, ok, I'm tired of patching around COLMAP. It's time to pivot.
 Today I downloaded the full image tar into a VM, made a copy of the images I'm using for my Sunset District experiments, and uploaded them as a tar to backblaze. It turns out they're only 10GB! So instead of waiting an hour to download all 160GB images now it should be a snappy 10min whenever I'm starting on a fresh VM.
 
 That is good but RAM consumption didn't change as I hoped it would. It still needs at minimum 60gb of RAM to load [presumably] the DB + images into memory.
+
+**March 27, 2026**
+
+I've begun looking at a new architecture, it seems promising. I don't think I want to make it public, though, so I'll set up a new private repo and keep working there. If you read this log and found the work interesting, I'd love to [chat](mailto:strnmrtnz@icloud.com).
