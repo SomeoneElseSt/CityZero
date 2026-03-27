@@ -533,3 +533,10 @@ That is good but RAM consumption didn't change as I hoped it would. It still nee
 **March 27, 2026**
 
 I've begun looking at a new architecture, it seems promising. I don't think I want to make it public, though, so I'll set up a new private repo and keep working there. If you read this log and found the work interesting, I'd love to [chat](mailto:strnmrtnz@icloud.com).
+
+**March 28, 2026**
+
+I won't log my work here nor commit the code publicly, but I do want to keep this updated. I'm setting up a Github action each time I add a new commit to a separate log in my private repo it adds a public hash here w/timestamped blobs of the log and code at that time inside a entries/ and working/ folder. It'll look something like:
+
+**{MM} {DD}, {YYYY}**
+Log: '{log_hash}', Code: '{code_hash}'.
