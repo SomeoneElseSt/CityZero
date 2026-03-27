@@ -542,6 +542,6 @@ I made a test run shown below. The folder blobs/ stores the .age files for the c
 
 **March 28, 2026**
 
-Log: '5b2b19e6b45d975a81a19ccedd7c716099ef6d71b8df8d6e0d98e0d0e2fc4e58'.
+Log: 'cb8e9aa13369dbf3ff3251c566018fe1e9b60f2d6e7fc264b295f74b92301b20'.
 
-Code: '123f86599d2ed1b6e2af3108de56cc1555e3cc3d'.
+Code: 'aec8437abd42bd825e57b06ed287d83c869a404d'.
