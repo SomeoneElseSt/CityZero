@@ -30,6 +30,9 @@ wip/db_info/
 wip/segmentation/outputs/
 wip/binaries/
 
+# Colmap
+colmap/
+
 # WIP data and outputs
 wip/*/images/
 wip/outputs/
