@@ -5,7 +5,9 @@ A tool to download images of a city from Mapillary and stitch them together into
 To create realistic city replicas that can be used to simulate traffic, pedestrians, and down the line, more complex social interactions within the model city. 
 
 # How?
-As of now: upload N images to a Lambda Cloud instance. There, use COLMAP with CUDA support to feature match images and solve for camera positions  (assumes Mapillary does not provide camera positions in advance). The binaries with camera models, poses, and 3D points are passed through Brush on Mac using Gaussian Splatting. A .ply file with the final positions and covariances is made that can be visualized in 3D with Brush also. See below some output examples from a 15k iterations run on images of Chinatown, San Francisco.
+That is what I am trying to figure out in this research log! 
+
+Below, some of my first iterations at smaller scales. 
 
 ![v.01 - 15k iterations - Image 1](./assets/sf-findi-run/v-0.1-15k-image-1.png)
 
@@ -15,14 +17,13 @@ Later I trained a 30k iteration version too that made some interesting internal 
 
 ![v.01 - 30k iterations - Image 1](./assets/sf-findi-run/v-0.1-30k-image-1.png)
 
-
 ---
 
 # Logs
 
 **January 17, 2026**
 
-After waiting for almost a month for the ~600k+ images or so to download, I realized a new type of algorithm is needed to make this work.
+After waiting for almost a month for the ~600k+ images or so to download, I realized a new type of algorithm is needed to make this work (over exhaustive matching).
 
 Logically, it's redundant to, for example, compare an image in the south of a city with one in the north. If [as is most likely] they are not related, it's wasted computation, and if they are, it's a false positive.
 
