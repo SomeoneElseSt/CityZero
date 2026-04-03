@@ -1,3 +1,5 @@
+> You can read an LLM summary of the below research log [here](https://claude.ai/share/16014c37-e417-49d2-9541-f77e7b162adb).  
+
 # What?
 A tool to download images of a city from Mapillary and stitch them together into a 3D model of that city using [Gaussian Splatting](https://www.youtube.com/watch?v=VkIJbpdTujE)
 
