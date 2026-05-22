@@ -581,3 +581,7 @@ Code: '79bd226ea36deb36e0aaa1d999c46e4a87efc5ad0c35b12b1396680fb27b6d98'.
 Log: '3dd075475e8ef0d60ae124dea113beb022fcc9893a58628e0ea6d9e2d178202f'.
 
 Code: '0c26d27931f3e048cb908f36efd9cdd2ee7e295a607bccf7fc8ee7dc50a80f37'.
+
+**May 22, 2026**
+
+Development work on CityZero has been paused through summer and will be resumed afterwards.
